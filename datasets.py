@@ -21,7 +21,7 @@ IMAGENET_LOC_ENV = "IMAGENET_DIR"
 # list of all datasets
 DATASETS = ["imagenet", "imagenet32", "cifar10", "pneumonia", "breakhis", "isic", "hyper"]
 
-def get_dataset(dataset: str, split: str) -> Dataset:
+def get_dataset(dataset: str, split: str, data_dir: str) -> Dataset:
     """Return the dataset as a PyTorch Dataset object"""
     if dataset == "imagenet":
         return _imagenet(split)
@@ -42,7 +42,7 @@ def get_dataset(dataset: str, split: str) -> Dataset:
         return _isic(split)
 
     elif dataset == "hyper":
-        return _hyper(split)
+        return _hyper(split, data_dir)
 
 
 def get_num_classes(dataset: str):
@@ -178,8 +178,8 @@ def _isic(split: str) -> Dataset:
                         transforms.Resize((224,224)),
                         transforms.ToTensor()]), split='test')
 
-def _hyper(split: str) -> Dataset:
-    data_dir = '../../X-MONAI/data'
+def _hyper(split: str, data_dir) -> Dataset:
+    # data_dir = '../../X-MONAI/data'
    
     if split == "train":
         return Hyper(root=data_dir, train=True, transform=transforms.Compose([

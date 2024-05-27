@@ -56,6 +56,8 @@ parser.add_argument('--philly_imagenet_path', type=str, default='',
                     help='Path to imagenet on philly')
 parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
+parser.add_argument('--data_dir', type=str, default='./data',
+                    help='Path to data directory')
 args = parser.parse_args()
 
 if args.azure_datastore_path:
@@ -76,7 +78,7 @@ def main():
     # Copy code to output directory
     # copy_code(args.outdir)
 
-    train_dataset = get_dataset(args.dataset, 'train')
+    train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
     test_dataset = get_dataset(args.dataset, 'test')
     pin_memory = (args.dataset == "imagenet")
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
