@@ -65,7 +65,7 @@ parser.add_argument('--focal', default=0, type=int,
 parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
 args = parser.parse_args()
-args.outdir = args.outdir+"/adapters"
+
 
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
@@ -106,7 +106,7 @@ def main():
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
     starting_epoch = 0
-    logfilename = os.path.join(args.outdir, 'log.txt')
+    logfilename = os.path.join(args.outdir+"/adapters", 'log.txt')
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
@@ -144,7 +144,7 @@ def main():
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
-            model.save_adapter(args.outdir, "denoising-adapter")
+            model.save_adapter( args.outdir+"/adapters", "denoising-adapter")
 
     
 
