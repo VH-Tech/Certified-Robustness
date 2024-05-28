@@ -64,6 +64,16 @@ parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
 parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
+
+parser.add_argument('--mixup_lam', type=float, default=0.1, 
+                    help='mixup lambda')
+parser.add_argument('--mixup_mode', type=str, default='class', 
+                    help='sampling mode (instance, class, sqrt, prog)')
+parser.add_argument('--mixup', type=int, default=0, 
+                    help='do mixup')
+parser.add_argument('--ssl_like', type=int, default=0, 
+                    help='do ssl like criterion')
+
 args = parser.parse_args()
 
 
@@ -75,9 +85,14 @@ def main():
     if args.gpu:
         # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
         pass
+    folder = "/adapters"
+
+    if args.focal :
+        folder += "_focal"
+
     
-    if not os.path.exists(args.outdir+"/adapters/"+str(args.noise_sd)):
-        os.makedirs(args.outdir+"/adapters/"+str(args.noise_sd))
+    if not os.path.exists(args.outdir+folder+"/"+str(args.noise_sd)):
+        os.makedirs(args.outdir+folder+"/"+str(args.noise_sd))
 
     train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
     test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
@@ -106,7 +121,8 @@ def main():
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
     starting_epoch = 0
-    logfilename = os.path.join(args.outdir+"/adapters/"+str(args.noise_sd), 'log.txt')
+
+    logfilename = os.path.join(args.outdir+folder+"/"+str(args.noise_sd), 'log.txt')
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
@@ -150,7 +166,7 @@ def main():
             print(f'New Best Found: {test_acc}%')
             best = test_acc
             normalize_layer, model = model
-            model.save_adapter( args.outdir+"/adapters/"+str(args.noise_sd), "denoising-adapter")
+            model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
             model = torch.nn.Sequential(normalize_layer, model)
 
     
