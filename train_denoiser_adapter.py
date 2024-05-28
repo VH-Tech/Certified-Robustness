@@ -121,10 +121,11 @@ def main():
                         .format(model_path, checkpoint['epoch']))
         
         #add adapters
-
+        normalize_layer, model = model()
         adapters.init(model)
         model.add_adapter("denoising-adapter", config="seq_bn")
         model.train_adapter("denoising-adapter")
+        model = torch.nn.Sequential(normalize_layer, model)
 
     else:
         print("please provide a valid checkpoint path")
