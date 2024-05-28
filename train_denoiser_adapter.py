@@ -76,8 +76,8 @@ def main():
         # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
         pass
     
-    if not os.path.exists(args.outdir):
-        os.makedirs(args.outdir)
+    if not os.path.exists(args.outdir+"/adapters/"+str(args.noise_sd)):
+        os.makedirs(args.outdir+"/adapters/"+str(args.noise_sd))
 
     train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
     test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
@@ -106,7 +106,7 @@ def main():
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
     starting_epoch = 0
-    logfilename = os.path.join(args.outdir+"/adapters", 'log.txt')
+    logfilename = os.path.join(args.outdir+"/adapters/"+str(args.noise_sd), 'log.txt')
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
@@ -114,14 +114,16 @@ def main():
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
                                 map_location=lambda storage, loc: storage)
-        starting_epoch = checkpoint['epoch']
+        # starting_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         # optimizer.load_state_dict(checkpoint['optimizer'])
         print("=> loaded checkpoint '{}' (epoch {})"
                         .format(model_path, checkpoint['epoch']))
         
         #add adapters
-        normalize_layer, model = model()
+        # print(model)
+        normalize_layer, model = model
+        print(normalize_layer)
         adapters.init(model)
         model.add_adapter("denoising-adapter", config="seq_bn")
         model.train_adapter("denoising-adapter")
@@ -131,6 +133,8 @@ def main():
         print("please provide a valid checkpoint path")
 
     best = 0.0 
+    init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
+    print("starting training")
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
@@ -145,7 +149,9 @@ def main():
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
-            model.save_adapter( args.outdir+"/adapters", "denoising-adapter")
+            normalize_layer, model = model
+            model.save_adapter( args.outdir+"/adapters/"+str(args.noise_sd), "denoising-adapter")
+            model = torch.nn.Sequential(normalize_layer, model)
 
     
 
@@ -169,6 +175,7 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
   
     # switch to train mode
     model.train()
+    model.to('cuda')
 
     for i, (inputs, targets) in enumerate(loader):
         # measure data loading time
