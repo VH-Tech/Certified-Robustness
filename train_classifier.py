@@ -67,10 +67,12 @@ if args.philly_imagenet_path:
 
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
+VIT = False
 
 def main():
     if args.gpu:
-        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+        # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+        pass
     
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir)
@@ -79,7 +81,7 @@ def main():
     # copy_code(args.outdir)
 
     train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
-    test_dataset = get_dataset(args.dataset, 'test')
+    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
     pin_memory = (args.dataset == "imagenet")
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=args.workers, pin_memory=pin_memory)
@@ -87,6 +89,10 @@ def main():
                              num_workers=args.workers, pin_memory=pin_memory)
 
     model = get_architecture(args.arch, args.dataset)
+
+    if "vit" in args.arch:
+        global VIT
+        VIT = True
 
     if args.focal:
 
@@ -173,7 +179,11 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
         # compute output
         outputs = model(inputs)
+        if VIT == True :
+            outputs = outputs.logits
+        
         # print(outputs.shape, targets.shape)
+        
         loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
@@ -234,6 +244,9 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
 
             # compute output
             outputs = model(inputs)
+            if VIT == True :
+                outputs = outputs.logits
+                
             loss = criterion(outputs, targets)
 
             # measure accuracy and record loss
