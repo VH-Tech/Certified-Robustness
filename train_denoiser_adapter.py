@@ -16,7 +16,7 @@ import numpy as np
 from transformers import TrainingArguments, EvalPrediction
 from adapters import AdapterTrainer
 
-
+import json
 import adapters
 import argparse
 import datetime
@@ -125,8 +125,10 @@ def main():
     logfilename = os.path.join(args.outdir+folder+"/"+str(args.noise_sd), 'log.txt')
 
     ## Resume from checkpoint if exists and if resume flag is True
+    adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
-    if args.resume and os.path.isfile(model_path):
+
+    if os.path.isfile(model_path):
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
                                 map_location=lambda storage, loc: storage)
@@ -139,14 +141,27 @@ def main():
         #add adapters
         # print(model)
         normalize_layer, model = model
-        print(normalize_layer)
         adapters.init(model)
-        model.add_adapter("denoising-adapter", config="seq_bn")
+
+        if args.resume : 
+            # load adapter from path
+            model.load_adapter(adapter_path)
+            checkpoint_adapter = torch.load(model_path,
+                                map_location=lambda storage, loc: storage)
+            starting_epoch = checkpoint_adapter['epoch']
+            optimizer.load_state_dict(checkpoint_adapter['optimizer'])
+
+        else:
+            model.add_adapter("denoising-adapter", config="seq_bn")
+
+        #set active adapter
+        model.set_active_adapters("denoising-adapter")
         model.train_adapter("denoising-adapter")
         model = torch.nn.Sequential(normalize_layer, model)
 
     else:
         print("please provide a valid checkpoint path")
+        return
 
     best = 0.0 
     init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
@@ -162,11 +177,24 @@ def main():
             scheduler.get_lr()[0], train_loss, test_loss, train_acc, test_acc))
 
         scheduler.step(epoch)
+
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
             normalize_layer, model = model
+
+            # Save adapter
             model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
+            torch.save({
+                'epoch': epoch + 1,
+                'arch': args.arch,
+                'optimizer': optimizer.state_dict(),
+                'train_acc' : train_acc,
+                'test_acc' : test_acc,
+                'train_loss' : train_loss,
+                'test_loss' : test_loss,
+            }, os.path.join(adapter_path, 'checkpoint.pth.tar'))
+            
             model = torch.nn.Sequential(normalize_layer, model)
 
     

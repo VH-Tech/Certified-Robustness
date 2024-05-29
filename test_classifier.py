@@ -115,7 +115,7 @@ def main():
         print(test_loss, test_acc)
 
     else:
-        if args.resume: print("=> no checkpoint found at '{}', please check the path provided".format(args.outdir))
+        print("=> no checkpoint found at '{}', please check the path provided".format(args.outdir))
 
 
 

@@ -11,6 +11,7 @@ from torch.optim import SGD, Optimizer
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code
+import json
 
 import argparse
 import datetime
@@ -111,6 +112,7 @@ def main():
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
+    
     if args.resume and os.path.isfile(model_path):
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
@@ -120,6 +122,7 @@ def main():
         optimizer.load_state_dict(checkpoint['optimizer'])
         print("=> loaded checkpoint '{}' (epoch {})"
                         .format(model_path, checkpoint['epoch']))
+        
     else:
         if args.resume: print("=> no checkpoint found at '{}'".format(args.outdir))
         init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
@@ -136,6 +139,7 @@ def main():
             scheduler.get_lr()[0], train_loss, test_loss, train_acc, test_acc))
 
         scheduler.step(epoch)
+       
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
