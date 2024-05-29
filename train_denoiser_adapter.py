@@ -26,6 +26,8 @@ import time
 import torch
 import random
 
+from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
+
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
                     choices=DATASETS)
@@ -65,6 +67,7 @@ parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
 parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
+parser.add_argument("--adapter_config", type=str, help="Adapter config")
 
 parser.add_argument('--mixup_lam', type=float, default=0.1, 
                     help='mixup lambda')
@@ -90,6 +93,31 @@ def main():
 
     if args.focal :
         folder += "_focal"
+
+    config = "seq_bn"
+    if args.adapter_config:
+        folder += "_"+args.adapter_config
+
+        if args.adapter_config == "par_bn":
+            config = ParBnConfig()
+
+        elif args.adapter_config == "seq_bn":
+            config = SeqBnConfig()
+
+        elif args.adapter_config == "seq_bn_inv":
+            config = SeqBnInvConfig()  
+
+        elif args.adapter_config == "prefix_tuning":
+            config = PrefixTuningConfig()
+
+        elif args.adapter_config == "compacter":
+            config = CompacterConfig()
+
+        elif args.adapter_config == "lora":
+            config = LoRAConfig()
+
+        elif args.adapter_config == "ia3":
+            config = IA3Config()
 
     
     if not os.path.exists(args.outdir+folder+"/"+str(args.noise_sd)):
@@ -151,9 +179,11 @@ def main():
                                 map_location=lambda storage, loc: storage)
             starting_epoch = checkpoint_adapter['epoch']
             optimizer.load_state_dict(checkpoint_adapter['optimizer'])
+            best = checkpoint_adapter['test_acc']
 
         else:
-            model.add_adapter("denoising-adapter", config="seq_bn")
+            model.add_adapter("denoising-adapter", config=config)
+            best = 0.0 
 
         #set active adapter
         model.set_active_adapters("denoising-adapter")
@@ -164,7 +194,7 @@ def main():
         print("please provide a valid checkpoint path")
         return
 
-    best = 0.0 
+
     init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
     print("starting training")
     for epoch in range(starting_epoch, args.epochs):
