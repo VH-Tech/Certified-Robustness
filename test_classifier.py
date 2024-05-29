@@ -18,6 +18,7 @@ import numpy as np
 import os
 import time
 import torch
+import random
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
@@ -149,6 +150,10 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
 
             inputs = inputs.cuda()
             targets = targets.cuda()
+
+            if noise_sd == -1:
+                #choose randomly a value between 0 and 1
+                noise_sd = random.random()
 
             # augment inputs with noise
             inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
