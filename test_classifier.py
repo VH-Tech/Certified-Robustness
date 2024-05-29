@@ -11,7 +11,6 @@ from torch.optim import SGD, Optimizer
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code
-import json
 
 import argparse
 import datetime
@@ -19,6 +18,7 @@ import numpy as np
 import os
 import time
 import torch
+import random
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
@@ -75,17 +75,13 @@ def main():
         # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
         pass
     
-    if not os.path.exists(args.outdir):
-        os.makedirs(args.outdir)
-
     # Copy code to output directory
     # copy_code(args.outdir)
 
     train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
     test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
     pin_memory = (args.dataset == "imagenet")
-    train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
-                              num_workers=args.workers, pin_memory=pin_memory)
+
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
                              num_workers=args.workers, pin_memory=pin_memory)
 
@@ -104,117 +100,29 @@ def main():
     else:
         criterion = CrossEntropyLoss().cuda()
 
-    optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
-
-    starting_epoch = 0
-    logfilename = os.path.join(args.outdir, 'log.txt')
-
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
-    
-    if args.resume and os.path.isfile(model_path):
+    if os.path.isfile(model_path):
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
                                 map_location=lambda storage, loc: storage)
-        starting_epoch = checkpoint['epoch']
+
         model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
+
         print("=> loaded checkpoint '{}' (epoch {})"
                         .format(model_path, checkpoint['epoch']))
-        
-    else:
-        if args.resume: print("=> no checkpoint found at '{}'".format(args.outdir))
-        init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
 
-    best = 0.0 
-    for epoch in range(starting_epoch, args.epochs):
-        before = time.time()
-        train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
         test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
-        after = time.time()
+        print(test_loss, test_acc)
 
-        log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
-            epoch, after - before,
-            scheduler.get_lr()[0], train_loss, test_loss, train_acc, test_acc))
-
-        scheduler.step(epoch)
-       
-        if test_acc > best:
-            print(f'New Best Found: {test_acc}%')
-            best = test_acc
-            torch.save({
-                'epoch': epoch + 1,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-            }, os.path.join(args.outdir, 'checkpoint.pth.tar'))
+    else:
+        print("=> no checkpoint found at '{}', please check the path provided".format(args.outdir))
 
 
-def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
-    """
-    Function to do one training epoch
-        :param loader:DataLoader: dataloader (train) 
-        :param model:torch.nn.Module: the classifer being trained
-        :param criterion: the loss function
-        :param optimizer:Optimizer: the optimizer used during trainined
-        :param epoch:int: the current epoch number (for logging)
-        :param noise_sd:float: the std-dev of the Guassian noise perturbation of the input
-    """
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    # top5 = AverageMeter()
-    end = time.time()
-  
-    # switch to train mode
-    model.train()
 
-    for i, (inputs, targets) in enumerate(loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
 
-        inputs = inputs.cuda()
-        targets = targets.cuda()
 
-        # augment inputs with noise
-        inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
 
-        # compute output
-        outputs = model(inputs)
-        if VIT == True :
-            outputs = outputs.logits
-        
-        # print(outputs.shape, targets.shape)
-        
-        loss = criterion(outputs, targets)
-
-        # measure accuracy and record loss
-        acc1 = accuracy(outputs, targets, topk=(1,))[0]
-        losses.update(loss.item(), inputs.size(0))
-        top1.update(acc1.item(), inputs.size(0))
-        # top5.update(acc5.item(), inputs.size(0))
-
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        if i % args.print_freq == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Acc@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                epoch, i, len(loader), batch_time=batch_time,
-                data_time=data_time, loss=losses, top1=top1))
-
-    return (losses.avg, top1.avg)
 
 
 def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float):
@@ -242,6 +150,10 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
 
             inputs = inputs.cuda()
             targets = targets.cuda()
+
+            if noise_sd == -1:
+                #choose randomly a value between 0 and 1
+                noise_sd = random.random()
 
             # augment inputs with noise
             inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd

@@ -58,7 +58,12 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False) ->
 
     #ViT
     elif arch == "google/vit-base-patch16-224-in21k" and dataset in ["pneumonia", "breakhis", "isic", "hyper"]:
-        model = ViTForImageClassification.from_pretrained(arch, num_labels=get_num_classes(dataset))
+
+        # Specify the cache directory
+        cache_directory = './model_cache'
+
+        # Load the model, specifying the cache directory
+        model = ViTForImageClassification.from_pretrained(arch, num_labels=get_num_classes(dataset), cache_dir=cache_directory)
         model = model.cuda()
 
     elif arch == "resnet18" and dataset == "imagenet":

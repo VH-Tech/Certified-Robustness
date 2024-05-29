@@ -16,7 +16,7 @@ import numpy as np
 from transformers import TrainingArguments, EvalPrediction
 from adapters import AdapterTrainer
 
-
+import json
 import adapters
 import argparse
 import datetime
@@ -24,6 +24,7 @@ import numpy as np
 import os
 import time
 import torch
+import random
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
@@ -64,8 +65,18 @@ parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
 parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
+
+parser.add_argument('--mixup_lam', type=float, default=0.1, 
+                    help='mixup lambda')
+parser.add_argument('--mixup_mode', type=str, default='class', 
+                    help='sampling mode (instance, class, sqrt, prog)')
+parser.add_argument('--mixup', type=int, default=0, 
+                    help='do mixup')
+parser.add_argument('--ssl_like', type=int, default=0, 
+                    help='do ssl like criterion')
+
 args = parser.parse_args()
-args.outdir = args.outdir+"/adapters"
+
 
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
@@ -75,9 +86,14 @@ def main():
     if args.gpu:
         # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
         pass
+    folder = "/adapters"
+
+    if args.focal :
+        folder += "_focal"
+
     
-    if not os.path.exists(args.outdir):
-        os.makedirs(args.outdir)
+    if not os.path.exists(args.outdir+folder+"/"+str(args.noise_sd)):
+        os.makedirs(args.outdir+folder+"/"+str(args.noise_sd))
 
     train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
     test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
@@ -106,31 +122,51 @@ def main():
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
     starting_epoch = 0
-    logfilename = os.path.join(args.outdir, 'log.txt')
+
+    logfilename = os.path.join(args.outdir+folder+"/"+str(args.noise_sd), 'log.txt')
 
     ## Resume from checkpoint if exists and if resume flag is True
+    adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
-    if args.resume and os.path.isfile(model_path):
+
+    if os.path.isfile(model_path):
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
                                 map_location=lambda storage, loc: storage)
-        starting_epoch = checkpoint['epoch']
+        # starting_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         # optimizer.load_state_dict(checkpoint['optimizer'])
         print("=> loaded checkpoint '{}' (epoch {})"
                         .format(model_path, checkpoint['epoch']))
         
         #add adapters
-        normalize_layer, model = model()
+        # print(model)
+        normalize_layer, model = model
         adapters.init(model)
-        model.add_adapter("denoising-adapter", config="seq_bn")
+
+        if args.resume : 
+            # load adapter from path
+            model.load_adapter(adapter_path)
+            checkpoint_adapter = torch.load(model_path,
+                                map_location=lambda storage, loc: storage)
+            starting_epoch = checkpoint_adapter['epoch']
+            optimizer.load_state_dict(checkpoint_adapter['optimizer'])
+
+        else:
+            model.add_adapter("denoising-adapter", config="seq_bn")
+
+        #set active adapter
+        model.set_active_adapters("denoising-adapter")
         model.train_adapter("denoising-adapter")
         model = torch.nn.Sequential(normalize_layer, model)
 
     else:
         print("please provide a valid checkpoint path")
+        return
 
     best = 0.0 
+    init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
+    print("starting training")
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
@@ -142,10 +178,25 @@ def main():
             scheduler.get_lr()[0], train_loss, test_loss, train_acc, test_acc))
 
         scheduler.step(epoch)
+
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
-            model.save_adapter(args.outdir, "denoising-adapter")
+            normalize_layer, model = model
+
+            # Save adapter
+            model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
+            torch.save({
+                'epoch': epoch + 1,
+                'arch': args.arch,
+                'optimizer': optimizer.state_dict(),
+                'train_acc' : train_acc,
+                'test_acc' : test_acc,
+                'train_loss' : train_loss,
+                'test_loss' : test_loss,
+            }, os.path.join(adapter_path, 'checkpoint.pth.tar'))
+            
+            model = torch.nn.Sequential(normalize_layer, model)
 
     
 
@@ -169,6 +220,7 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
   
     # switch to train mode
     model.train()
+    model.to('cuda')
 
     for i, (inputs, targets) in enumerate(loader):
         # measure data loading time
@@ -178,6 +230,10 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
         targets = targets.cuda()
 
         # augment inputs with noise
+        if noise_sd == -1:
+            #choose randomly a value between 0 and 1
+            noise_sd = random.random()
+
         inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
 
         # compute output
@@ -243,6 +299,10 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
             targets = targets.cuda()
 
             # augment inputs with noise
+            if noise_sd == -1:
+                #choose randomly a value between 0 and 1
+                noise_sd = random.random()
+                
             inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
 
             # compute output
