@@ -6,11 +6,13 @@
 from architectures import CLASSIFIERS_ARCHITECTURES, get_architecture
 from datasets import get_dataset, DATASETS
 from loss import FocalLoss
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, MSELoss
 from torch.optim import SGD, Optimizer
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code
+from mixup_utils import ComboLoader, get_combo_loader
+import torch.nn.functional as F
 
 import numpy as np
 from transformers import TrainingArguments, EvalPrediction
@@ -24,6 +26,7 @@ import numpy as np
 import os
 import time
 import torch
+import torchvision
 import random
 
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
@@ -90,6 +93,9 @@ def main():
         # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
         pass
     folder = "/adapters"
+
+    if args.mixup:
+        folder += "_mixup"
 
     if args.focal :
         folder += "_focal"
@@ -201,7 +207,13 @@ def main():
     print("starting training")
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
-        train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
+
+        if args.mixup:
+            train_loss = train_mixup(train_loader, criterion, optimizer, epoch, args.noise_sd, model, mixup_lam=args.mixup_lam)
+            train_acc = 0
+        else:
+            train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
+
         test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
         after = time.time()
 
@@ -231,6 +243,102 @@ def main():
             model = torch.nn.Sequential(normalize_layer, model)
 
     
+
+def train_mixup(loader: DataLoader, criterion, optimizer: Optimizer, epoch: int, noise_sd: float, classifier: torch.nn.Module=None, mode='instance', mixup_lam=0.1):
+    """
+    Function for training denoiser for one epoch
+        :param loader:DataLoader: training dataloader
+        :param denoiser:torch.nn.Module: the denoiser being trained
+        :param criterion: loss function
+        :param optimizer:Optimizer: optimizer used during trainined
+        :param epoch:int: the current epoch (for logging)
+        :param noise_sd:float: the std-dev of the Guassian noise perturbation of the input
+        :param classifier:torch.nn.Module=None: a ``freezed'' classifier attached to the denoiser 
+                                                (required classifciation/stability objectives), None for denoising objective 
+    """
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+    end = time.time()
+
+    loader = get_combo_loader(loader, mode=mode)
+
+
+    for i, batch in enumerate(loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
+        lam = np.random.beta(a=mixup_lam, b=1)
+
+        inputs, targets = batch[0][0], batch[0][1]
+        balanced_inputs, balanced_targets = batch[1][0], batch[1][1]
+
+        inputs, targets = inputs.cuda(), targets.squeeze().cuda()
+        balanced_inputs, balanced_targets = balanced_inputs.cuda(), balanced_targets.squeeze().cuda()
+
+        inputs_mixup = (1 - lam) * inputs + lam * balanced_inputs
+        targets_mixup = (1 - lam) * F.one_hot(targets, 23) + lam * F.one_hot(balanced_targets, 23)
+
+        # augment inputs with noise
+        noise = torch.randn_like(inputs_mixup, device='cuda') * noise_sd
+
+        # compute output
+
+        outputs_mixup = classifier(inputs_mixup + noise)
+        outputs_mixup = outputs_mixup.logits
+        
+        if isinstance(criterion, MSELoss):
+            loss = criterion(outputs_mixup, inputs_mixup)
+        else:
+            if args.objective in ['classification', 'stability', 'focal', 'ldam'] and args.ssl_like == 1:
+                with torch.no_grad():
+                    targets_mixup = classifier(inputs_mixup)
+                    targets_mixup = targets_mixup.argmax(1).detach().clone()
+                
+            loss = criterion(outputs_mixup, targets_mixup)
+
+        if args.both:
+            inputs = torch.cat((inputs, balanced_inputs), 0)
+            targets = torch.cat((targets, balanced_targets), 0)
+
+            noise = torch.randn_like(inputs, device='cuda') * noise_sd
+
+            # compute output
+            outputs = classifier(inputs + noise)
+            outputs = outputs.logits
+
+            if isinstance(criterion, MSELoss):
+                loss = criterion(outputs, inputs)
+            else:
+                if args.objective in ['classification', 'stability', 'focal', 'ldam'] and args.ssl_like == 1:
+                    with torch.no_grad():
+                        targets = classifier(inputs).logits
+                        targets = targets.argmax(1).detach().clone()
+                    
+                loss += criterion(outputs, targets)
+
+
+        # record loss
+        losses.update(loss.item(), inputs.size(0))
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        if i % args.print_freq == 0:
+            print('Epoch: [{0}][{1}/{2}]\t'
+                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                  'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                  'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
+                epoch, i, len(loader), batch_time=batch_time,
+                data_time=data_time, loss=losses))
+
+    return losses.avg
 
 
 def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
