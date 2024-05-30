@@ -26,6 +26,7 @@ parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, choices=DATASETS)
 parser.add_argument('--arch', type=str, choices=DENOISERS_ARCHITECTURES)
 parser.add_argument('--outdir', type=str, help='folder to save denoiser and training log)')
+parser.add_argument('--data_dir', type=str, help='folder to load training data from')
 parser.add_argument('--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=40, type=int, metavar='N',
@@ -94,17 +95,21 @@ torch.cuda.manual_seed_all(0)
 toPilImage = ToPILImage()
 
 def main():
-    if args.gpu:
-        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    # if args.gpu:
+    #     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir)
 
+    if "vit" in args.arch:
+        global VIT
+        VIT = True
+
     # Copy code to output directory
     # copy_code(args.outdir)
     
-    train_dataset = get_dataset(args.dataset, 'train')
-    test_dataset = get_dataset(args.dataset, 'test')
+    train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
+    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
     pin_memory = (args.dataset == "imagenet")
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=args.workers, pin_memory=pin_memory)
@@ -164,8 +169,8 @@ def main():
     elif args.objective in ['classification', 'stability', 'focal', 'ldam']:
         assert args.classifier != '', "Please specify a path to the classifier you want to attach the denoiser to."
 
-        if args.classifier in IMAGENET_CLASSIFIERS:
-            assert args.dataset == 'imagenet'
+        if args.classifier in IMAGENET_CLASSIFIERS and args.dataset == 'imagenet':
+            # assert args.dataset == 'imagenet'
             # loading pretrained imagenet architectures
             clf = get_architecture(args.classifier, args.dataset, pytorch_pretrained=True)
         else:
@@ -280,6 +285,8 @@ def train(loader: DataLoader, denoiser: torch.nn.Module, criterion, optimizer: O
         outputs = denoiser(inputs + noise)
         if classifier:
             outputs = classifier(outputs)
+            # if VIT == True :
+            outputs = outputs.logits
         
         if isinstance(criterion, MSELoss):
             loss = criterion(outputs, inputs)

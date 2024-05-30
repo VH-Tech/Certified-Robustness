@@ -175,6 +175,7 @@ def test_with_classifier(loader: DataLoader, denoiser: torch.nn.Module, criterio
                 inputs = denoiser(inputs)
             # compute output
             outputs = classifier(inputs)
+            outputs = outputs.logits
             loss = criterion(outputs, targets)
 
             # measure accuracy and record loss
