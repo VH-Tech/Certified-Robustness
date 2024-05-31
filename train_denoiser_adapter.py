@@ -200,7 +200,7 @@ def main():
         scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
         if args.resume:
-            optimizer.load_state_dict(checkpoint['optimizer'])
+            optimizer.load_state_dict(checkpoint_adapter['optimizer'])
 
     else:
         print("please provide a valid checkpoint path")
