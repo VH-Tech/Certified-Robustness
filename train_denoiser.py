@@ -146,7 +146,7 @@ def main():
         checkpoint = torch.load(denoiser_path,
                                 map_location=lambda storage, loc: storage)
         assert checkpoint['arch'] == args.arch
-        starting_epoch = checkpoint['epoch']
+        # starting_epoch = checkpoint['epoch']
         denoiser.load_state_dict(checkpoint['state_dict'])
         if starting_epoch >= args.start_sgd_epoch and args.optimizer == 'AdamThenSGD ': # Do adam for few steps thaen continue SGD
             print("-->[Switching from Adam to SGD.]")

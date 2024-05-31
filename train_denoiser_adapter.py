@@ -36,7 +36,7 @@ from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfi
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
                     choices=DATASETS)
-parser.add_argument('--arch', type=str, 
+parser.add_argument('--arch', type=str, default="google/vit-base-patch16-224-in21k",
                     choices=CLASSIFIERS_ARCHITECTURES)
 parser.add_argument('--outdir', type=str, 
                     help='folder to save model and training log)')
