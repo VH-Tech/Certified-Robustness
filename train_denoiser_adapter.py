@@ -14,10 +14,12 @@ from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code
 from mixup_utils import ComboLoader, get_combo_loader
 import torch.nn.functional as F
 
+from utils import count_parameters_total, count_parameters_trainable
 import numpy as np
 from transformers import TrainingArguments, EvalPrediction
 from adapters import AdapterTrainer
 
+from torch.utils.data import Dataset
 import json
 import adapters
 import argparse
@@ -152,8 +154,6 @@ def main():
     else:
         criterion = CrossEntropyLoss().cuda()
 
-    optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
     starting_epoch = 0
 
@@ -169,7 +169,7 @@ def main():
                                 map_location=lambda storage, loc: storage)
         # starting_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
-        # optimizer.load_state_dict(checkpoint['optimizer'])
+
         print("=> loaded checkpoint '{}' (epoch {})"
                         .format(model_path, checkpoint['epoch']))
         
@@ -184,8 +184,6 @@ def main():
             checkpoint_adapter = torch.load(os.path.join(adapter_path, 'checkpoint.pth.tar'),
                                 map_location=lambda storage, loc: storage)
             # starting_epoch = checkpoint_adapter['epoch']
-            print(checkpoint_adapter.keys())
-            optimizer.load_state_dict(checkpoint_adapter['optimizer'])
             best = checkpoint_adapter['test_acc']
 
         else:
@@ -198,12 +196,18 @@ def main():
         model.train_adapter("denoising-adapter")
         model = torch.nn.Sequential(normalize_layer, model)
 
+        optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+        scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
+
+        if args.resume:
+            optimizer.load_state_dict(checkpoint['optimizer'])
+
     else:
         print("please provide a valid checkpoint path")
         return
 
 
-    
+    print("Training " +  (count_parameters_trainable(model)/(count_parameters_trainable(model) + count_parameters_total(model)))*100  +"% of the parameters")
     print("starting training")
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
@@ -242,7 +246,6 @@ def main():
             
             model = torch.nn.Sequential(normalize_layer, model)
 
-    
 
 def train_mixup(loader: DataLoader, criterion, optimizer: Optimizer, epoch: int, noise_sd: float, classifier: torch.nn.Module=None, mode='instance', mixup_lam=0.1):
     """

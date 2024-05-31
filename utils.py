@@ -3,7 +3,7 @@ from prettytable import PrettyTable
 
 
 
-def count_parameters(model):
+def count_parameters_trainable(model):
     table = PrettyTable(["Modules", "Parameters"])
     total_params = 0
     for name, parameter in model.named_parameters():
@@ -19,6 +19,7 @@ def count_parameters(model):
         f.write(str(total_params))
     print(table)
     print(f"Total Trainable Params: {total_params}")
+    return total_params
 
 
 def count_parameters_total(model):
@@ -34,6 +35,7 @@ def count_parameters_total(model):
         f.write("\n Total Trainable Params:")
         f.write(str(total_params))
     print(table)
-    print(f"Total Trainable Params: {total_params}")
+    print(f"Total Params: {total_params}")
+    return total_params
 
 
