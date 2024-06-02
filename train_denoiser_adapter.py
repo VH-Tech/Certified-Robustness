@@ -195,16 +195,22 @@ def main():
         model.set_active_adapters("denoising-adapter")
         model.train_adapter("denoising-adapter")
         model = torch.nn.Sequential(normalize_layer, model)
+        model.to('cuda')
 
         optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
         scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
         if args.resume:
             optimizer.load_state_dict(checkpoint['optimizer'])
+            #change optimizers lr
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = args.lr
 
     else:
         print("please provide a valid checkpoint path")
         return
+
+
 
 
     print("Training " +  (count_parameters_trainable(model)/(count_parameters_trainable(model) + count_parameters_total(model)))*100  +"% of the parameters")
@@ -359,11 +365,10 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
     losses = AverageMeter()
     top1 = AverageMeter()
     # top5 = AverageMeter()
-    end = time.time()
-  
+    end = time.time()  
+
     # switch to train mode
     model.train()
-    model.to('cuda')
 
     for i, (inputs, targets) in enumerate(loader):
         # measure data loading time
