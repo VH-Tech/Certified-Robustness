@@ -21,7 +21,7 @@ IMAGENET_LOC_ENV = "IMAGENET_DIR"
 # list of all datasets
 DATASETS = ["imagenet", "imagenet32", "cifar10", "pneumonia", "breakhis", "isic", "hyper"]
 
-def get_dataset(dataset: str, split: str, data_dir: str) -> Dataset:
+def get_dataset(dataset: str, split: str, data_dir: str, noise_sd=0) -> Dataset:
     """Return the dataset as a PyTorch Dataset object"""
     if dataset == "imagenet":
         return _imagenet(split)
@@ -42,7 +42,7 @@ def get_dataset(dataset: str, split: str, data_dir: str) -> Dataset:
         return _isic(split)
 
     elif dataset == "hyper":
-        return _hyper(split, data_dir)
+        return _hyper(split, data_dir, noise_sd)
 
 
 def get_num_classes(dataset: str):
@@ -178,20 +178,22 @@ def _isic(split: str) -> Dataset:
                         transforms.Resize((224,224)),
                         transforms.ToTensor()]), split='test')
 
-def _hyper(split: str, data_dir) -> Dataset:
+def _hyper(split: str, data_dir, noise_sd) -> Dataset:
     # data_dir = '../../X-MONAI/data'
    
     if split == "train":
         return Hyper(root=data_dir, train=True, transform=transforms.Compose([
                         transforms.Resize((256,256)),
                         transforms.RandomCrop(224), 
-                        transforms.RandomHorizontalFlip(), 
-                        transforms.ToTensor()]))
+                        transforms.RandomHorizontalFlip(),
+                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV), 
+                        transforms.ToTensor()]), noise_sd=noise_sd)
     
     elif split == "test":
         return Hyper(root=data_dir, train=False, transform=transforms.Compose([
                         transforms.Resize((224,224)),
-                        transforms.ToTensor()]))
+                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV),
+                        transforms.ToTensor()]), noise_sd=noise_sd)
 
 class NormalizeLayer(torch.nn.Module):
     """Standardize the channels of a batch of images by subtracting the dataset mean
@@ -344,12 +346,13 @@ HYPER_CLASSES = {
     }
 
 class Hyper(Dataset):
-    def __init__(self, root='../../medical_image_experiments', train=True, transform=None):
+    def __init__(self, root='../../medical_image_experiments', train=True, transform=None, noise_sd=0):
         self.train = train
         self.image_paths = glob.glob(f'{root}/labeled-images/*/*/*/*.jpg')
         self.labels = pd.read_csv(f'{root}/labeled-images/image-labels.csv')
         self.split = pd.read_csv('https://raw.githubusercontent.com/simula/hyper-kvasir/master/official_splits/2_fold_split.csv',sep=';')
         self.get_split()
+        self.noise_sd = noise_sd
         self.targets = []
         for image_path in self.image_paths:
             self.targets.append(HYPER_CLASSES[self.labels[self.labels['Video file'] == image_path.split('/')[-1].split('.')[0]]['Finding'].reset_index(drop=True)[0]])
@@ -368,6 +371,11 @@ class Hyper(Dataset):
 
         if self.transform is not None:
             image = self.transform(image)
+
+        #add gaussian noise to the image
+        noise = torch.randn_like(image) * self.noise_sd
+        image = image + noise
+
         return image, target
 
     def get_split(self):
