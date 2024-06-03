@@ -92,23 +92,6 @@ def main():
 
     model = get_architecture(args.arch, args.dataset)
 
-    if args.adapter_config is not None:
-        folder = "/adapters"
-
-    if args.mixup:
-        folder += "_mixup"
-
-    if args.focal :
-        folder += "_focal"
-
-    if args.adapter_config:
-        folder += "_"+args.adapter_config
-        adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
-        normalize_layer, model = model
-        model.load_adapter(adapter_path)
-        model.set_active_adapters("denoising-adapter")
-
-
     if "vit" in args.arch:
         global VIT
         VIT = True
@@ -134,11 +117,29 @@ def main():
         print("=> loaded checkpoint '{}' (epoch {})"
                         .format(model_path, checkpoint['epoch']))
 
-        test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
-        print(test_loss, test_acc)
-
     else:
         print("=> no checkpoint found at '{}', please check the path provided".format(args.outdir))
+        return
+    
+    if args.adapter_config is not None:
+        folder = "/adapters"
+
+    if args.mixup:
+        folder += "_mixup"
+
+    if args.focal :
+        folder += "_focal"
+
+    if args.adapter_config:
+        folder += "_"+args.adapter_config
+        adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
+        normalize_layer, model = model
+        model.load_adapter(adapter_path)
+        model.set_active_adapters("denoising-adapter")
+
+    test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
+    print(test_loss, test_acc)
+
 
 
 
