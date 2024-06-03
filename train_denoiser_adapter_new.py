@@ -31,7 +31,7 @@ from adapters import AdapterTrainer
 
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('--dataset', type=str, 
+parser.add_argument('--dataset', type=str, default="hyper",
                     choices=DATASETS)
 parser.add_argument('--arch', type=str, default="google/vit-base-patch16-224-in21k",
                     choices=CLASSIFIERS_ARCHITECTURES)
@@ -242,6 +242,7 @@ def main():
     model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
 
 
-
+if __name__ == "__main__":
+    main()
 
         

@@ -185,15 +185,15 @@ def _hyper(split: str, data_dir, noise_sd) -> Dataset:
         return Hyper(root=data_dir, train=True, transform=transforms.Compose([
                         transforms.Resize((256,256)),
                         transforms.RandomCrop(224), 
-                        transforms.RandomHorizontalFlip(),
-                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV), 
-                        transforms.ToTensor()]), noise_sd=noise_sd)
+                        transforms.RandomHorizontalFlip(), 
+                        transforms.ToTensor(),
+                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV)]), noise_sd=noise_sd)
     
     elif split == "test":
         return Hyper(root=data_dir, train=False, transform=transforms.Compose([
                         transforms.Resize((224,224)),
-                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV),
-                        transforms.ToTensor()]), noise_sd=noise_sd)
+                        transforms.ToTensor(),
+                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV),]), noise_sd=noise_sd)
 
 class NormalizeLayer(torch.nn.Module):
     """Standardize the channels of a batch of images by subtracting the dataset mean

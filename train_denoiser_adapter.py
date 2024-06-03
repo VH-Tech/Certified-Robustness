@@ -34,7 +34,7 @@ import random
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('--dataset', type=str, 
+parser.add_argument('--dataset', type=str, default="hyper",
                     choices=DATASETS)
 parser.add_argument('--arch', type=str, default="google/vit-base-patch16-224-in21k",
                     choices=CLASSIFIERS_ARCHITECTURES)
@@ -194,7 +194,7 @@ def main():
         #set active adapter
         model.set_active_adapters("denoising-adapter")
         model.train_adapter("denoising-adapter")
-        model = torch.nn.Sequential(normalize_layer, model)
+        # model = torch.nn.Sequential(normalize_layer, model)
         model.to('cuda')
 
         optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
@@ -213,7 +213,7 @@ def main():
 
 
 
-    print("Training " +  (count_parameters_trainable(model)/(count_parameters_trainable(model) + count_parameters_total(model)))*100  +"% of the parameters")
+    # print("Training " +  (count_parameters_trainable(model)/(count_parameters_trainable(model) + count_parameters_total(model)))*100  +"% of the parameters")
     print("starting training")
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
@@ -236,10 +236,11 @@ def main():
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
-            normalize_layer, model = model
+            # normalize_layer, model = model
 
             # Save adapter
             model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
+            # model = torch.nn.Sequential(normalize_layer, model)
             torch.save({
                 'epoch': epoch + 1,
                 'arch': args.arch,
@@ -250,7 +251,7 @@ def main():
                 'test_loss' : test_loss,
             }, os.path.join(adapter_path, 'checkpoint.pth.tar'))
             
-            model = torch.nn.Sequential(normalize_layer, model)
+
 
 
 def train_mixup(loader: DataLoader, criterion, optimizer: Optimizer, epoch: int, noise_sd: float, classifier: torch.nn.Module=None, mode='instance', mixup_lam=0.1):
