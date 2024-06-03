@@ -27,6 +27,8 @@ import torchvision
 import random
 from torchvision import transforms, datasets
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
+from adapters import AdapterTrainer
+
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
@@ -126,12 +128,6 @@ def main():
     if not os.path.exists(args.outdir+folder+"/"+str(args.noise_sd)):
         os.makedirs(args.outdir+folder+"/"+str(args.noise_sd))
 
-    
-    _IMAGENET_MEAN = [0.485, 0.456, 0.406]
-    _IMAGENET_STDDEV = [0.229, 0.224, 0.225]
-
-
-
     train_dataset = get_dataset(args.dataset, 'train', args.data_dir, noise_sd=args.noise_sd)
     test_dataset = get_dataset(args.dataset, 'test', args.data_dir, noise_sd=args.noise_sd)
 
@@ -196,4 +192,53 @@ def main():
         #set active adapter
         model.set_active_adapters("denoising-adapter")
         model.train_adapter("denoising-adapter")
+
+    else:
+        print("=> no checkpoint found at '{}'".format(model_path))
+        
+
+    class CustomTrainer(AdapterTrainer):
+    #Add a parameter for Criterion
+        def __init__(self, model, args, train_dataset, eval_dataset, criterion, compute_metrics):
+            super().__init__(model=model, args=args, train_dataset=train_dataset, eval_dataset=eval_dataset, compute_metrics=compute_metrics)
+            self.criterion = criterion
+
+        def compute_loss(self, model, inputs, return_outputs=False):
+            outputs = model(**inputs)
+            # Compute custom loss here
+            custom_loss = self.criterion(outputs.logits, inputs['labels'])
+            return (custom_loss, outputs) if return_outputs else custom_loss
+        
+    training_args = TrainingArguments(
+        learning_rate=args.lr,
+        num_train_epochs=args.epochs,
+        per_device_train_batch_size=args.batch,
+        per_device_eval_batch_size=args.batch,
+        logging_steps=200,
+        output_dir="./training_output",
+        overwrite_output_dir=True,
+        # The next line is important to ensure the dataset labels are properly passed to the model
+        remove_unused_columns=False,
+    )
+
+    def compute_accuracy(p: EvalPrediction):
+        preds = np.argmax(p.predictions, axis=1)
+        return {"acc": (preds == p.label_ids).mean()}
+    
+    trainer = CustomTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset,
+        # Add the criterion to the trainer
+        criterion=criterion,
+        compute_metrics=compute_accuracy,
+    )
+
+    trainer.train()
+    trainer.evaluate()
+
+
+
+
         
