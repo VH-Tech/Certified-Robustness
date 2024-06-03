@@ -179,15 +179,15 @@ def main():
         if args.resume : 
             # load adapter from path
             model.load_adapter(adapter_path)
-            checkpoint_adapter = torch.load(os.path.join(adapter_path, 'checkpoint.pth.tar'),
-                                map_location=lambda storage, loc: storage)
-            # starting_epoch = checkpoint_adapter['epoch']
-            best = checkpoint_adapter['test_acc']
+            # checkpoint_adapter = torch.load(os.path.join(adapter_path, 'checkpoint.pth.tar'),
+            #                     map_location=lambda storage, loc: storage)
+            # # starting_epoch = checkpoint_adapter['epoch']
+            # best = checkpoint_adapter['test_acc']
 
         else:
             model.add_adapter("denoising-adapter", config=config)
             init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
-            best = 0.0 
+            # best = 0.0 
 
         #set active adapter
         model.set_active_adapters("denoising-adapter")
@@ -237,6 +237,9 @@ def main():
 
     trainer.train()
     trainer.evaluate()
+
+    # Save adapter
+    model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
 
 
 
