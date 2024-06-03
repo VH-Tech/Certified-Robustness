@@ -34,7 +34,7 @@ import random
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('--dataset', type=str, 
+parser.add_argument('--dataset', type=str, default="hyper",
                     choices=DATASETS)
 parser.add_argument('--arch', type=str, default="google/vit-base-patch16-224-in21k",
                     choices=CLASSIFIERS_ARCHITECTURES)
@@ -213,7 +213,7 @@ def main():
 
 
 
-    print("Training " +  (count_parameters_trainable(model)/(count_parameters_trainable(model) + count_parameters_total(model)))*100  +"% of the parameters")
+    # print("Training " +  (count_parameters_trainable(model)/(count_parameters_trainable(model) + count_parameters_total(model)))*100  +"% of the parameters")
     print("starting training")
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
