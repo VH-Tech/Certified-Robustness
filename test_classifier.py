@@ -19,6 +19,7 @@ import os
 import time
 import torch
 import random
+from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
@@ -59,6 +60,10 @@ parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
 parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
+# adapters
+parser.add_argument('--adapter_config', type=str, default=None,
+                    help='Adapter name')
+
 args = parser.parse_args()
 
 if args.azure_datastore_path:
@@ -86,6 +91,23 @@ def main():
                              num_workers=args.workers, pin_memory=pin_memory)
 
     model = get_architecture(args.arch, args.dataset)
+
+    if args.adapter_config is not None:
+        folder = "/adapters"
+
+    if args.mixup:
+        folder += "_mixup"
+
+    if args.focal :
+        folder += "_focal"
+
+    if args.adapter_config:
+        folder += "_"+args.adapter_config
+        adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
+        normalize_layer, model = model
+        model.load_adapter(adapter_path)
+        model.set_active_adapters("denoising-adapter")
+
 
     if "vit" in args.arch:
         global VIT
