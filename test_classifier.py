@@ -20,6 +20,7 @@ import time
 import torch
 import random
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
+import adapters
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
@@ -62,6 +63,9 @@ parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
 # adapters
 parser.add_argument('--adapter_config', type=str, default=None,
+                    help='Adapter name')
+
+parser.add_argument('--mixup', type=str, default=None,
                     help='Adapter name')
 
 args = parser.parse_args()
@@ -134,9 +138,11 @@ def main():
         folder += "_"+args.adapter_config
         adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
         normalize_layer, model = model
+        adapters.init(model)
         model.load_adapter(adapter_path)
         model.set_active_adapters("denoising-adapter")
 
+    model.to('cuda')
     test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
     print(test_loss, test_acc)
 
