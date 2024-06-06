@@ -109,21 +109,22 @@ def main():
     else:
         criterion = CrossEntropyLoss().cuda()
 
-    ## Resume from checkpoint if exists and if resume flag is True
-    model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
-    if os.path.isfile(model_path):
-        print("=> loading checkpoint '{}'".format(model_path))
-        checkpoint = torch.load(model_path,
-                                map_location=lambda storage, loc: storage)
+    ## Load Weights if required
+    if args.dataset not in ["cifar10", "imagenet"]:
+        model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
+        if os.path.isfile(model_path):
+            print("=> loading checkpoint '{}'".format(model_path))
+            checkpoint = torch.load(model_path,
+                                    map_location=lambda storage, loc: storage)
 
-        model.load_state_dict(checkpoint['state_dict'])
+            model.load_state_dict(checkpoint['state_dict'])
 
-        print("=> loaded checkpoint '{}' (epoch {})"
-                        .format(model_path, checkpoint['epoch']))
+            print("=> loaded checkpoint '{}' (epoch {})"
+                            .format(model_path, checkpoint['epoch']))
 
-    else:
-        print("=> no checkpoint found at '{}', please check the path provided".format(args.outdir))
-        return
+        else:
+            print("=> no checkpoint found at '{}', please check the path provided".format(args.outdir))
+            return
     
     if args.adapter_config is not None:
         folder = "/adapters"

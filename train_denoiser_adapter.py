@@ -2,7 +2,7 @@
 #   https://github.com/bearpaw/pytorch-classification
 # written by Wei Yang.
 
-
+from accelerate import Accelerator
 from architectures import CLASSIFIERS_ARCHITECTURES, get_architecture
 from datasets import get_dataset, DATASETS
 from loss import FocalLoss
@@ -32,7 +32,7 @@ import torchvision
 import random
 
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
-
+accelerator = Accelerator()
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, default="hyper",
                     choices=DATASETS)
@@ -163,7 +163,7 @@ def main():
     adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
 
-    if os.path.isfile(model_path):
+    if os.path.isfile(model_path) and args.dataset not in ["cifar10", "imagenet"]:
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
                                 map_location=lambda storage, loc: storage)
@@ -178,41 +178,39 @@ def main():
         normalize_layer, model = model
         adapters.init(model)
 
-        if args.resume : 
-            # load adapter from path
-            model.load_adapter(adapter_path)
-            checkpoint_adapter = torch.load(os.path.join(adapter_path, 'checkpoint.pth.tar'),
-                                map_location=lambda storage, loc: storage)
-            # starting_epoch = checkpoint_adapter['epoch']
-            best = checkpoint_adapter['test_acc']
+    if args.dataset in ["cifar10", "imagenet"]:
+        normalize_layer, model = model
+        adapters.init(model)
 
-        else:
-            model.add_adapter("denoising-adapter", config=config)
-            init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
-            best = 0.0 
-
-        #set active adapter
-        model.set_active_adapters("denoising-adapter")
-        model.train_adapter("denoising-adapter")
-        # model = torch.nn.Sequential(normalize_layer, model)
-        model.to('cuda')
-
-        optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-        scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
-
-        if args.resume:
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            #change optimizers lr
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = args.lr
+    if args.resume : 
+        # load adapter from path
+        model.load_adapter(adapter_path)
+        checkpoint_adapter = torch.load(os.path.join(adapter_path, 'checkpoint.pth.tar'),
+                            map_location=lambda storage, loc: storage)
+        # starting_epoch = checkpoint_adapter['epoch']
+        best = checkpoint_adapter['test_acc']
 
     else:
-        print("please provide a valid checkpoint path")
-        return
+        model.add_adapter("denoising-adapter", config=config)
+        init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
+        best = 0.0 
+
+    #set active adapter
+    model.set_active_adapters("denoising-adapter")
+    model.train_adapter("denoising-adapter")
+    # model = torch.nn.Sequential(normalize_layer, model)
+    model.to('cuda')
+    optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
+
+    if args.resume:
+        optimizer.load_state_dict(checkpoint_adapter['optimizer'])
+        #change optimizers lr
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = args.lr
 
 
-
-
+    model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
     print("Training " +  str((count_parameters_trainable(model)/(count_parameters_trainable(model) + count_parameters_total(model)))*100)  +"% of the parameters")
     print("starting training")
     for epoch in range(starting_epoch, args.epochs):
@@ -239,12 +237,13 @@ def main():
             # normalize_layer, model = model
 
             # Save adapter
-            model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
+            # model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
             # model = torch.nn.Sequential(normalize_layer, model)
             torch.save({
                 'epoch': epoch + 1,
                 'arch': args.arch,
                 'optimizer': optimizer.state_dict(),
+                'state_dict': model.state_dict(),
                 'train_acc' : train_acc,
                 'test_acc' : test_acc,
                 'train_loss' : train_loss,
@@ -402,7 +401,8 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        loss.backward()
+        # loss.backward()
+        accelerator.backward(loss)
         optimizer.step()
 
         # measure elapsed time

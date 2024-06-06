@@ -30,7 +30,7 @@ def get_dataset(dataset: str, split: str, data_dir: str, noise_sd=0) -> Dataset:
         return _imagenet32(split)
 
     elif dataset == "cifar10":
-        return _cifar10(split)
+        return _cifar10(split, data_dir= data_dir)
 
     elif dataset == "pneumonia":
         return _pneumonia(split)
@@ -88,19 +88,29 @@ _CIFAR10_MEAN = [0.4914, 0.4822, 0.4465]
 _CIFAR10_STDDEV = [0.2023, 0.1994, 0.2010]
 
 
-def _cifar10(split: str) -> Dataset:
-    dataset_path = os.path.join(os.getenv('PT_DATA_DIR', 'datasets'), 'dataset_cache')
+def _cifar10(split: str, data_dir) -> Dataset:
     if split == "train":
-        return datasets.CIFAR10(dataset_path, train=True, download=True, transform=transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor()
-        ]))
+        train = True
     elif split == "test":
-        return datasets.CIFAR10(dataset_path, train=False, download=True, transform=transforms.ToTensor())
+        train = False
+    transform = transforms.Compose([
+            transforms.Resize(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=_CIFAR10_MEAN, std=_CIFAR10_STDDEV),])
+    return datasets.CIFAR10(data_dir, train=train, download=True, transform=transform)
 
-    else:
-        raise Exception("Unknown split name.")
+    # dataset_path = os.path.join(os.getenv('PT_DATA_DIR', 'datasets'), 'dataset_cache')
+    # if split == "train":
+    #     return datasets.CIFAR10(dataset_path, train=True, download=True, transform=transforms.Compose([
+    #         transforms.RandomCrop(32, padding=4),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor()
+    #     ]))
+    # elif split == "test":
+    #     return datasets.CIFAR10(dataset_path, train=False, download=True, transform=transforms.ToTensor())
+
+    # else:
+    #     raise Exception("Unknown split name.")
 
 
 def _imagenet(split: str) -> Dataset:

@@ -18,6 +18,7 @@ IMAGENET_CLASSIFIERS = [
                         'resnet34', 
                         'resnet50',
                         "google/vit-base-patch16-224-in21k",
+                        "vit"
                         ]
 
 CIFAR10_CLASSIFIERS = [
@@ -26,7 +27,7 @@ CIFAR10_CLASSIFIERS = [
                         'VGG16', 'VGG19', 'ResNet18','PreActResNet18','GoogLeNet',
                         'DenseNet121','ResNeXt29_2x64d','MobileNet','MobileNetV2',
                         'SENet18','ShuffleNetV2','EfficientNetB0'
-                        'imagenet32_resnet110', 'imagenet32_wrn',
+                        'imagenet32_resnet110', 'imagenet32_wrn',"vit"
                         ]
 
 CLASSIFIERS_ARCHITECTURES = IMAGENET_CLASSIFIERS + CIFAR10_CLASSIFIERS
@@ -57,13 +58,22 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False) ->
         model = model.cuda()
 
     #ViT
-    elif arch == "google/vit-base-patch16-224-in21k" and dataset in ["pneumonia", "breakhis", "isic", "hyper"]:
+    elif arch == "vit" and dataset in ["pneumonia", "breakhis", "isic", "hyper"]:
 
         # Specify the cache directory
         cache_directory = './model_cache'
 
         # Load the model, specifying the cache directory
-        model = ViTForImageClassification.from_pretrained(arch, num_labels=get_num_classes(dataset), cache_dir=cache_directory)
+        model = ViTForImageClassification.from_pretrained("google/vit-base-patch16-224-in21k", num_labels=get_num_classes(dataset), cache_dir=cache_directory)
+        model = model.cuda()
+
+    elif arch == "vit" and dataset in ["cifar10"]:
+
+        # Specify the cache directory
+        cache_directory = './model_cache'
+
+        # Load the model, specifying the cache directory
+        model = ViTForImageClassification.from_pretrained("aaraki/vit-base-patch16-224-in21k-finetuned-cifar10", num_labels=get_num_classes(dataset), cache_dir=cache_directory)
         model = model.cuda()
 
     elif arch == "resnet18" and dataset == "imagenet":

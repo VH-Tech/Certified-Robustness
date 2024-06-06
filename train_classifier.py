@@ -2,7 +2,7 @@
 #   https://github.com/bearpaw/pytorch-classification
 # written by Wei Yang.
 
-
+from accelerate import Accelerator
 from architectures import CLASSIFIERS_ARCHITECTURES, get_architecture
 from datasets import get_dataset, DATASETS
 from loss import FocalLoss
@@ -60,6 +60,8 @@ parser.add_argument('--focal', default=0, type=int,
 parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
 args = parser.parse_args()
+
+accelerator = Accelerator()
 
 if args.azure_datastore_path:
     os.environ['IMAGENET_DIR_AZURE'] = os.path.join(args.azure_datastore_path, 'datasets/imagenet_zipped')
@@ -128,6 +130,7 @@ def main():
         init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
 
     best = 0.0 
+    model, optimizer, training_dataloader, scheduler = accelerator.prepare(model, optimizer, training_dataloader, scheduler)
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
