@@ -12,3 +12,4 @@ from .preact_resnet import *
 from .mobilenet import *
 from .mobilenetv2 import *
 from .efficientnet import *
+from .swin_transformer import * 

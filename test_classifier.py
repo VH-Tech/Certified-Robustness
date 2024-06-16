@@ -61,6 +61,9 @@ parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
 parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
+
+parser.add_argument('--dataset_fraction', type=float, default='1.0',
+                    help='Path to data directory')
 # adapters
 parser.add_argument('--adapter_config', type=str, default=None,
                     help='Adapter name')
@@ -75,8 +78,9 @@ if args.azure_datastore_path:
 if args.philly_imagenet_path:
     os.environ['IMAGENET_DIR_PHILLY'] = os.path.join(args.philly_imagenet_path, './')
 
-torch.manual_seed(0)
-torch.cuda.manual_seed_all(0)
+random.seed(0)
+# torch.manual_seed(0)
+# torch.cuda.manual_seed_all(0)
 VIT = False
 
 def main():
@@ -95,6 +99,7 @@ def main():
                              num_workers=args.workers, pin_memory=pin_memory)
 
     model = get_architecture(args.arch, args.dataset)
+    _ , model = model
 
     if "vit" in args.arch:
         global VIT
@@ -110,7 +115,7 @@ def main():
         criterion = CrossEntropyLoss().cuda()
 
     ## Load Weights if required
-    if args.dataset not in ["cifar10", "imagenet"]:
+    if args.dataset not in ["imagenet","hyper"]:
         model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
         if os.path.isfile(model_path):
             print("=> loading checkpoint '{}'".format(model_path))
@@ -137,20 +142,16 @@ def main():
 
     if args.adapter_config:
         folder += "_"+args.adapter_config
+        folder += "_"+str(args.dataset_fraction)
         adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
         normalize_layer, model = model
         adapters.init(model)
         model.load_adapter(adapter_path)
         model.set_active_adapters("denoising-adapter")
-
+    # normalize_layer, model = model
     model.to('cuda')
     test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
     print(test_loss, test_acc)
-
-
-
-
-
 
 
 

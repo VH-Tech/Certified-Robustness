@@ -25,21 +25,23 @@ def main(args):
     torch.cuda.manual_seed_all(0)
 
     results = {}
-    args.denoiser = os.path.join(os.getenv('PT_DATA_DIR', './'), args.denoiser)
-    checkpoint = torch.load(args.denoiser)
+    args.denoiser = os.path.join(args.denoiser, 'checkpoint.pth.tar')
+    checkpoint = torch.load(args.denoiser, map_location='cuda')
     denoiser = get_architecture(checkpoint['arch'] ,args.dataset)
-    denoiser.load_state_dict(checkpoint['state_dict'])
+    new_state_dict = {}
+    for k, v in checkpoint['state_dict'].items():
+        name = k[7:] # remove `module.`
+        new_state_dict[name] = v
+    denoiser.load_state_dict(new_state_dict)
     denoiser.cuda().eval()
 
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
-    args.outdir = os.path.join(os.getenv('PT_OUTPUT_DIR', './'), args.outdir)
-    
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir)
 
-    test_dataset = get_dataset(args.dataset, 'test')
+    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
     pin_memory = (args.dataset == "imagenet")
 
     if args.test_subset:
@@ -54,10 +56,13 @@ def main(args):
     print('MSE of the denoiser is {}'.format(test_loss))
     results['denoising_MSE'] = test_loss
     if args.clf != '':
-        if args.clf in IMAGENET_CLASSIFIERS:
+        if args.clf in IMAGENET_CLASSIFIERS and args.dataset == 'imagenet':
             assert args.dataset == 'imagenet'
             # loading pretrained imagenet architectures
             clf = get_architecture(args.clf ,args.dataset, pytorch_pretrained=True)
+        
+        elif args.clf in IMAGENET_CLASSIFIERS and args.dataset != 'imagenet':
+            clf = get_architecture(args.clf ,args.dataset)
         else:
             args.clf = os.path.join(os.getenv('PT_DATA_DIR', './'), args.clf)
             checkpoint = torch.load(args.clf)
@@ -175,7 +180,7 @@ def test_with_classifier(loader: DataLoader, denoiser: torch.nn.Module, criterio
                 inputs = denoiser(inputs)
             # compute output
             outputs = classifier(inputs)
-            outputs = outputs.logits
+            # outputs = outputs.logits
             loss = criterion(outputs, targets)
 
             # measure accuracy and record loss
@@ -218,8 +223,10 @@ if __name__ == "__main__":
                         metavar='N', help='print frequency (default: 10)')
     parser.add_argument('--noise_sd', default=0.0, type=float,
                         help="standard deviation of noise distribution for data augmentation")
+    parser.add_argument('--data_dir', type=str,
+                        help="standard deviation of noise distribution for data augmentation")
     parser.add_argument('--test-subset', action='store_true',
                         help='evaluate only a predifined subset ~(1%) of the test set')
     args = parser.parse_args()
     
-    main(args)
+    print(main(args))

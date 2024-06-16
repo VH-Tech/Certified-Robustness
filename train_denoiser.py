@@ -1,8 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 # File for training denoisers with at most one classifier attached to
-
-from architectures import DENOISERS_ARCHITECTURES, get_architecture, IMAGENET_CLASSIFIERS
+from accelerate import Accelerator
+from architectures import DENOISERS_ARCHITECTURES, get_architecture, IMAGENET_CLASSIFIERS, CIFAR10_CLASSIFIERS
 from datasets import get_dataset, DATASETS
 from mixup_utils import get_combo_loader
 from loss import *
@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import StepLR, MultiStepLR
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToPILImage
 from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code, requires_grad_
-
+import wandb
 import argparse
 import datetime
 import numpy as np
@@ -22,6 +22,7 @@ import time
 import torch
 import torchvision
 
+accelerator = Accelerator()
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, choices=DATASETS)
 parser.add_argument('--arch', type=str, choices=DENOISERS_ARCHITECTURES)
@@ -117,7 +118,7 @@ def main():
                              num_workers=args.workers, pin_memory=pin_memory)
     ## This is used to test the performance of the denoiser attached to a cifar10 classifier
     if args.dataset == 'cifar10':
-        cifar10_test_loader = DataLoader(get_dataset('cifar10', 'test'), shuffle=False, batch_size=args.batch,
+        cifar10_test_loader = DataLoader(get_dataset('cifar10', 'test', args.data_dir), shuffle=False, batch_size=args.batch,
                              num_workers=args.workers, pin_memory=pin_memory)
 
     if args.pretrained_denoiser:
@@ -147,6 +148,11 @@ def main():
                                 map_location=lambda storage, loc: storage)
         assert checkpoint['arch'] == args.arch
         # starting_epoch = checkpoint['epoch']
+        # new_state_dict = {}
+        # for k, v in checkpoint['state_dict'].items():
+        #     name = k[7:] # remove `module.`
+        #     new_state_dict[name] = v
+        # denoiser.load_state_dict(new_state_dict)
         denoiser.load_state_dict(checkpoint['state_dict'])
         if starting_epoch >= args.start_sgd_epoch and args.optimizer == 'AdamThenSGD ': # Do adam for few steps thaen continue SGD
             print("-->[Switching from Adam to SGD.]")
@@ -168,14 +174,22 @@ def main():
 
     elif args.objective in ['classification', 'stability', 'focal', 'ldam']:
         assert args.classifier != '', "Please specify a path to the classifier you want to attach the denoiser to."
+        if args.classifier == 'resnet50':
+            clf = get_architecture(args.classifier, args.dataset, pytorch_pretrained=True)
+            print("loaded resnet50")
 
-        if args.classifier in IMAGENET_CLASSIFIERS and args.dataset == 'imagenet':
+        elif args.classifier in IMAGENET_CLASSIFIERS and args.dataset == 'imagenet':
             # assert args.dataset == 'imagenet'
             # loading pretrained imagenet architectures
             clf = get_architecture(args.classifier, args.dataset, pytorch_pretrained=True)
+
+        elif args.classifier in CIFAR10_CLASSIFIERS and args.dataset == 'cifar10':
+            clf = get_architecture(args.classifier, args.dataset, pytorch_pretrained=True)
+
         else:
             checkpoint = torch.load(args.classifier)
             clf = get_architecture(checkpoint['arch'], args.dataset)
+            _,clf=clf
             clf.load_state_dict(checkpoint['state_dict'])
         clf.cuda().eval()
         requires_grad_(clf, False)
@@ -194,6 +208,19 @@ def main():
         else:
             criterion = CrossEntropyLoss().cuda()
         best_acc = 0
+    denoiser, optimizer, train_loader, scheduler = accelerator.prepare(denoiser, optimizer, train_loader, scheduler)
+    wandb.login()
+    run = wandb.init(
+    # Set the project where this run will be logged
+    project="denoiser_"+args.dataset+"_"+str(args.noise_sd),
+    # Track hyperparameters and run metadata
+    config={
+        "learning_rate": args.lr,
+        "epochs": args.epochs,
+    },
+    )
+
+
 
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
@@ -212,7 +239,7 @@ def main():
                 test_loss, test_acc = test_with_classifier(test_loader, denoiser, criterion, args.noise_sd, args.print_freq, clf)
 
         after = time.time()
-
+        wandb.log({"train_loss": train_loss, "test_loss": test_loss, "test_acc": test_acc})
         log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
             epoch, after - before,
             args.lr, train_loss, test_loss, test_acc))
@@ -286,7 +313,7 @@ def train(loader: DataLoader, denoiser: torch.nn.Module, criterion, optimizer: O
         if classifier:
             outputs = classifier(outputs)
             # if VIT == True :
-            outputs = outputs.logits
+            # outputs = outputs.logits
         
         if isinstance(criterion, MSELoss):
             loss = criterion(outputs, inputs)
@@ -302,7 +329,8 @@ def train(loader: DataLoader, denoiser: torch.nn.Module, criterion, optimizer: O
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        loss.backward()
+        # loss.backward()
+        accelerator.backward(loss)
         optimizer.step()
 
         # measure elapsed time

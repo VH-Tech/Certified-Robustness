@@ -6,3 +6,8 @@ ViT*
 notebooks
 train_scripts
 *.txt
+wandb
+data
+*.ipynb
+Convnets
+PDFs

@@ -9,7 +9,7 @@ from loss import FocalLoss
 from torch.nn import CrossEntropyLoss, MSELoss
 from torch.optim import SGD, Optimizer
 from torch.optim.lr_scheduler import StepLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code
 from mixup_utils import ComboLoader, get_combo_loader
 import torch.nn.functional as F
@@ -36,15 +36,15 @@ accelerator = Accelerator()
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, default="hyper",
                     choices=DATASETS)
-parser.add_argument('--arch', type=str, default="google/vit-base-patch16-224-in21k",
+parser.add_argument('--arch', type=str, default="vit",
                     choices=CLASSIFIERS_ARCHITECTURES)
-parser.add_argument('--outdir', type=str, 
+parser.add_argument('--outdir', type=str, default="/storage/vatsal/models/cifar10",
                     help='folder to save model and training log)')
 parser.add_argument('--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=90, type=int, metavar='N',
                     help='number of total epochs to run')
-parser.add_argument('--batch', default=64, type=int, metavar='N',
+parser.add_argument('--batch', default=256, type=int, metavar='N',
                     help='batchsize (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     help='initial learning rate', dest='lr')
@@ -70,10 +70,10 @@ parser.add_argument('--philly_imagenet_path', type=str, default='',
                     help='Path to imagenet on philly')
 parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
-parser.add_argument('--data_dir', type=str, default='./data',
+parser.add_argument('--data_dir', type=str, default='/storage/vatsal/datasets/hyper',
                     help='Path to data directory')
-parser.add_argument("--adapter_config", type=str, help="Adapter config")
-
+parser.add_argument("--adapter_config", type=str, help="Adapter config", default="compacter")
+parser.add_argument("--dataset_fraction", type=float, default=1.0, help="Fraction of dataset to use")
 parser.add_argument('--mixup_lam', type=float, default=0.1, 
                     help='mixup lambda')
 parser.add_argument('--mixup_mode', type=str, default='class', 
@@ -127,14 +127,22 @@ def main():
         elif args.adapter_config == "ia3":
             config = IA3Config()
 
-    
+    folder += "_"+str(args.dataset_fraction)
     if not os.path.exists(args.outdir+folder+"/"+str(args.noise_sd)):
         os.makedirs(args.outdir+folder+"/"+str(args.noise_sd))
 
     train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
     test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
+
+    # Define the desired subset size
+    subset_size = int(len(train_dataset) * args.dataset_fraction)
+
+    # Create a subset of the CIFAR10 dataset
+    subset_indices = torch.randperm(len(train_dataset))[:subset_size]
+    subset_train_dataset = Subset(train_dataset, subset_indices)
+
     pin_memory = (args.dataset == "imagenet")
-    train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
+    train_loader = DataLoader(subset_train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=args.workers, pin_memory=pin_memory)
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
                              num_workers=args.workers, pin_memory=pin_memory)

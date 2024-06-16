@@ -94,9 +94,10 @@ def _cifar10(split: str, data_dir) -> Dataset:
     elif split == "test":
         train = False
     transform = transforms.Compose([
-            transforms.Resize(224),
+            # transforms.Resize(224),
             transforms.ToTensor(),
-            transforms.Normalize(mean=_CIFAR10_MEAN, std=_CIFAR10_STDDEV),])
+            transforms.Normalize(mean=_CIFAR10_MEAN, std=_CIFAR10_STDDEV),
+            ])
     return datasets.CIFAR10(data_dir, train=train, download=True, transform=transform)
 
     # dataset_path = os.path.join(os.getenv('PT_DATA_DIR', 'datasets'), 'dataset_cache')
@@ -203,7 +204,8 @@ def _hyper(split: str, data_dir, noise_sd) -> Dataset:
         return Hyper(root=data_dir, train=False, transform=transforms.Compose([
                         transforms.Resize((224,224)),
                         transforms.ToTensor(),
-                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV),]), noise_sd=noise_sd)
+                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV),
+                        ]), noise_sd=noise_sd)
 
 class NormalizeLayer(torch.nn.Module):
     """Standardize the channels of a batch of images by subtracting the dataset mean

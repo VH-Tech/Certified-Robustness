@@ -8,11 +8,13 @@ from datasets import get_dataset, DATASETS
 from loss import FocalLoss
 from torch.nn import CrossEntropyLoss
 from torch.optim import SGD, Optimizer
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 from torch.utils.data import DataLoader
-from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code
+from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code, cosine_scheduler
+#import Subset
+from torch.utils.data import Subset
 import json
-
+import wandb
 import argparse
 import datetime
 import numpy as np
@@ -59,6 +61,10 @@ parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
 parser.add_argument('--data_dir', type=str, default='./data',
                     help='Path to data directory')
+parser.add_argument('--tuning_method', type=str, default='full',
+                    help='Path to finetune model')
+parser.add_argument("--dataset_fraction", type=float, default=1.0,
+                    help="Fraction of dataset to use")
 args = parser.parse_args()
 
 accelerator = Accelerator()
@@ -84,6 +90,13 @@ def main():
     # copy_code(args.outdir)
 
     train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
+
+    subset_size = int(len(train_dataset) * args.dataset_fraction)
+
+    # Create a subset of the CIFAR10 dataset
+    subset_indices = torch.randperm(len(train_dataset))[:subset_size]
+    train_dataset = Subset(train_dataset, subset_indices)
+
     test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
     pin_memory = (args.dataset == "imagenet")
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
@@ -91,7 +104,8 @@ def main():
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
                              num_workers=args.workers, pin_memory=pin_memory)
 
-    model = get_architecture(args.arch, args.dataset)
+    model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method)
+    _, model = model
 
     if "vit" in args.arch:
         global VIT
@@ -106,11 +120,13 @@ def main():
     else:
         criterion = CrossEntropyLoss().cuda()
 
-    optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
 
     starting_epoch = 0
     logfilename = os.path.join(args.outdir, 'log.txt')
+
+    optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
+    scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr/1000)
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
@@ -119,7 +135,7 @@ def main():
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
                                 map_location=lambda storage, loc: storage)
-        starting_epoch = checkpoint['epoch']
+        # starting_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         print("=> loaded checkpoint '{}' (epoch {})"
@@ -129,8 +145,149 @@ def main():
         if args.resume: print("=> no checkpoint found at '{}'".format(args.outdir))
         init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
 
+    if args.tuning_method != 'full' and os.path.isfile(model_path):
+        print("=> loading checkpoint '{}'".format(model_path))
+        checkpoint = torch.load(model_path,map_location=lambda storage, loc: storage)
+        model.load_state_dict(checkpoint['state_dict'], strict=False)
+        print("=> loaded to finetune '{}' (epoch {})"
+                        .format(model_path, checkpoint['epoch']))
+                # freeze parameters if needed
+        tuning_method = args.tuning_method
+        if tuning_method == 'full':
+            # all parameters are trainable
+            pass 
+        elif tuning_method == 'prompt':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+
+                if name.startswith('norm'):
+                    continue
+
+                if 'tuning_module' in name:
+                    continue
+
+                param.requires_grad = False
+        elif tuning_method == 'adapter':
+            raise NotImplementedError
+        elif tuning_method == 'sidetune':
+            raise NotImplementedError
+        elif tuning_method == 'linear':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+                
+                if name.startswith('norm'):
+                    continue
+
+                param.requires_grad = False
+        elif tuning_method == 'norm':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+
+                if 'bn' in name:
+                    continue
+
+                if 'gn' in name:
+                    continue
+
+                if 'norm' in name:
+                    continue
+                
+                # adjust last group norm
+                if 'before_head' in name:
+                    continue
+
+                param.requires_grad = False    
+        elif tuning_method == 'bias':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+                
+                if name.startswith('norm'):
+                    continue
+
+                if 'bias' in name:
+                    continue
+
+                param.requires_grad = False
+        elif tuning_method == 'conv_adapt' or tuning_method == 'repnet':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+                
+                if 'tuning_module' in name:
+                    continue
+                
+                # add a norm layer before average pooling
+                if 'norm' in name:
+                    continue
+
+                param.requires_grad = False
+        elif tuning_method == 'conv_adapt_norm':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+                
+                if 'tuning_module' in name:
+                    continue
+
+                if 'bn' in name:
+                    continue
+
+                if 'gn' in name:
+                    continue
+
+                if 'norm' in name:
+                    continue
+                
+                # adjust last group norm
+                if 'before_head' in name:
+                    continue
+
+                param.requires_grad = False    
+        elif tuning_method == 'conv_adapt_bias' or tuning_method == 'repnet_bias':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+                
+                if 'tuning_module' in name:
+                    continue
+
+                if 'bias' in name:
+                    continue
+                
+                # add a norm layer before average pooling
+                if name.startswith('norm'):
+                    continue
+
+                param.requires_grad = False
+
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                print(f"{name} is trainable")
+
+        
     best = 0.0 
-    model, optimizer, training_dataloader, scheduler = accelerator.prepare(model, optimizer, training_dataloader, scheduler)
+    if args.tuning_method != 'full':
+        args.outdir = os.path.join(args.outdir, args.tuning_method, str(args.noise_sd), str(args.dataset_fraction))
+        os.makedirs(args.outdir, exist_ok=True)
+    
+    wandb.init(
+    # set the wandb project where this run will be logged
+    project=args.arch+"_"+args.dataset+"_"+args.tuning_method+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd),
+
+    # track hyperparameters and run metadata
+    config={
+    "learning_rate": args.lr,
+    "architecture": args.arch,
+    "dataset": args.dataset,
+    "epochs": args.epochs,
+    }
+    )
+    model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
+    model = model.cuda()
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
@@ -140,7 +297,6 @@ def main():
         log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
             epoch, after - before,
             scheduler.get_lr()[0], train_loss, test_loss, train_acc, test_acc))
-
         scheduler.step(epoch)
        
         if test_acc > best:
@@ -152,6 +308,9 @@ def main():
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
             }, os.path.join(args.outdir, 'checkpoint.pth.tar'))
+
+        wandb.log({"train_loss": train_loss, "test_loss": test_loss, "train_acc": train_acc, "test_acc": test_acc, "best" : best, "lr" : scheduler.get_lr()[0]})
+        
 
 
 def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
