@@ -21,7 +21,7 @@ IMAGENET_LOC_ENV = "IMAGENET_DIR"
 # list of all datasets
 DATASETS = ["imagenet", "imagenet32", "cifar10", "pneumonia", "breakhis", "isic", "hyper"]
 
-def get_dataset(dataset: str, split: str, data_dir: str, noise_sd=0) -> Dataset:
+def get_dataset(dataset: str, split: str, data_dir: str, noise_sd=0, model_input=32, do_norm=True) -> Dataset:
     """Return the dataset as a PyTorch Dataset object"""
     if dataset == "imagenet":
         return _imagenet(split)
@@ -30,7 +30,7 @@ def get_dataset(dataset: str, split: str, data_dir: str, noise_sd=0) -> Dataset:
         return _imagenet32(split)
 
     elif dataset == "cifar10":
-        return _cifar10(split, data_dir= data_dir)
+        return _cifar10(split, data_dir= data_dir, model_input=model_input, do_norm=do_norm)
 
     elif dataset == "pneumonia":
         return _pneumonia(split)
@@ -88,15 +88,21 @@ _CIFAR10_MEAN = [0.4914, 0.4822, 0.4465]
 _CIFAR10_STDDEV = [0.2023, 0.1994, 0.2010]
 
 
-def _cifar10(split: str, data_dir) -> Dataset:
+def _cifar10(split: str, data_dir, model_input, do_norm) -> Dataset:
     if split == "train":
         train = True
     elif split == "test":
         train = False
-    transform = transforms.Compose([
-            # transforms.Resize(224),
+    if do_norm == True:
+        transform = transforms.Compose([
+            transforms.Resize(model_input),
             transforms.ToTensor(),
             transforms.Normalize(mean=_CIFAR10_MEAN, std=_CIFAR10_STDDEV),
+            ])
+    else:
+        transform = transforms.Compose([
+            transforms.Resize(model_input),
+            transforms.ToTensor(),
             ])
     return datasets.CIFAR10(data_dir, train=train, download=True, transform=transform)
 

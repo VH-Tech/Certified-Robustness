@@ -334,13 +334,30 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tu
                     continue
 
                 param.requires_grad = False
-
+        elif tuning_method == 'compacter':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+                
+                if 'tuning_module' in name:
+                    continue
+                param.requires_grad = False
         for name, param in model.named_parameters():
             if param.requires_grad:
                 print(f"{name} is trainable")
 
         model = model.cuda()
 
+    # elif arch == "swin":
+    #     # Specify the cache directory
+    #     cache_directory = './model_cache'
+
+    #     # load pretrained model
+    #     model = AutoModelForImageClassification.from_pretrained("microsoft/swin-base-patch4-window7-224",  cache_dir=cache_directory)
+    #     # Update the final layer to match the number of CIFAR-10 classes (10)
+    #     model.config.num_labels = get_num_classes(dataset)
+    #     model.classifier = torch.nn.Linear(model.config.hidden_size, model.config.num_labels)
+    #     model = model.cuda()
 
     elif arch == "resnet18" and dataset == "imagenet":
         model = torch.nn.DataParallel(resnet18(pretrained=pytorch_pretrained)).cuda()

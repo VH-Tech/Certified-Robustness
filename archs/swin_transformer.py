@@ -7,7 +7,7 @@ import torch.nn as nn
 # from timm.models.helpers import checkpoint_seq
 from timm.models.layers import PatchEmbed, Mlp, DropPath, to_2tuple, to_ntuple, trunc_normal_, _assert
 
-from .tuning_modules import PadPrompter, ConvAdapter, LinearAdapter, ProgramModule
+from .tuning_modules import PadPrompter, ConvAdapter, LinearAdapter, ProgramModule, Compacter
 
 
 __all__ = [
@@ -214,6 +214,10 @@ class SwinTransformerBlock(nn.Module):
                                              groups=int(dim//tuning_config['adapt_size']), 
                                              dilation=1,
                                              act_layer=nn.GELU)
+            
+        if 'compacter' in self.tuning_config['method']:
+            self.tuning_module = Compacter(input_dim=dim)
+            
 
     def forward(self, x):
         H, W = self.input_resolution
@@ -258,8 +262,17 @@ class SwinTransformerBlock(nn.Module):
             x_adapt = x_adapt.view(B, H * W, C)
             x = x + x_adapt
 
-        x = x + self.drop_path(self.mlp(self.norm2(x)))
+        if 'compacter' in self.tuning_config['method']:
+            x_prev = x
+            x = self.tuning_module(x)
+            x = x + x_prev
 
+        x = x + self.drop_path(self.mlp(self.norm2(x)))
+        
+        if 'compacter' in self.tuning_config['method']:
+            x_prev = x
+            x = self.tuning_module(x)
+            x = x + x_prev
         return x
 
 

@@ -8,7 +8,7 @@ from datasets import get_dataset, DATASETS
 from loss import FocalLoss
 from torch.nn import CrossEntropyLoss, MSELoss
 from torch.optim import SGD, Optimizer
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 from torch.utils.data import DataLoader, Subset
 from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code
 from mixup_utils import ComboLoader, get_combo_loader
@@ -30,7 +30,7 @@ import time
 import torch
 import torchvision
 import random
-
+import wandb
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
 accelerator = Accelerator()
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -82,13 +82,17 @@ parser.add_argument('--mixup', type=int, default=0,
                     help='do mixup')
 parser.add_argument('--ssl_like', type=int, default=0, 
                     help='do ssl like criterion')
+parser.add_argument('--do_norm', type=int, default=1, 
+                    help='do ssl like criterion')
 
 args = parser.parse_args()
 
 
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
-VIT = False
+
+global VIT
+VIT = True
 
 def main():
     if args.gpu:
@@ -131,8 +135,23 @@ def main():
     if not os.path.exists(args.outdir+folder+"/"+str(args.noise_sd)):
         os.makedirs(args.outdir+folder+"/"+str(args.noise_sd))
 
-    train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
-    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
+    if args.do_norm == 0:
+        args.do_norm = False
+
+    else:
+        args.do_norm = True
+
+    print("Normalization : ", args.do_norm)
+
+    if "vit" in args.arch or "swin" in args.arch:
+        global VIT
+        VIT = True
+        train_dataset = get_dataset(args.dataset, 'train', args.data_dir, model_input=224, do_norm=args.do_norm)
+        test_dataset = get_dataset(args.dataset, 'test', args.data_dir, model_input=224, do_norm=args.do_norm)
+
+    else:
+        train_dataset = get_dataset(args.dataset, 'train', args.data_dir, do_norm=args.do_norm)
+        test_dataset = get_dataset(args.dataset, 'test', args.data_dir, do_norm=args.do_norm)
 
     # Define the desired subset size
     subset_size = int(len(train_dataset) * args.dataset_fraction)
@@ -150,7 +169,7 @@ def main():
     model = get_architecture(args.arch, args.dataset)
 
     if "vit" in args.arch:
-        global VIT
+        # global VIT
         VIT = True
 
     if args.focal:
@@ -210,12 +229,26 @@ def main():
     model.to('cuda')
     optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
+    scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr/1000)
 
     if args.resume:
         optimizer.load_state_dict(checkpoint_adapter['optimizer'])
         #change optimizers lr
         for param_group in optimizer.param_groups:
             param_group['lr'] = args.lr
+
+    wandb.init(
+    # set the wandb project where this run will be logged
+    project=args.arch+"_"+args.dataset+"_"+args.adapter_config+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd),
+
+    # track hyperparameters and run metadata
+    config={
+    "learning_rate": args.lr,
+    "architecture": args.arch,
+    "dataset": args.dataset,
+    "epochs": args.epochs,
+    }
+    )
 
 
     model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
@@ -257,6 +290,9 @@ def main():
                 'train_loss' : train_loss,
                 'test_loss' : test_loss,
             }, os.path.join(adapter_path, 'checkpoint.pth.tar'))
+
+        wandb.log({"train_loss": train_loss, "test_loss": test_loss, "train_acc": train_acc, "test_acc": test_acc, "best" : best, "lr" : scheduler.get_lr()[0]})
+        
             
 
 

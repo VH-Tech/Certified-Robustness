@@ -88,8 +88,15 @@ def main():
 
     # Copy code to output directory
     # copy_code(args.outdir)
-
-    train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
+    if "vit" in args.arch :
+        global VIT
+        VIT = True
+    if "vit" in args.arch or "swin" in args.arch:
+        train_dataset = get_dataset(args.dataset, 'train', args.data_dir, model_input=224)
+        test_dataset = get_dataset(args.dataset, 'test', args.data_dir, model_input=224)
+    else:
+        train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
+        test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
 
     subset_size = int(len(train_dataset) * args.dataset_fraction)
 
@@ -97,7 +104,7 @@ def main():
     subset_indices = torch.randperm(len(train_dataset))[:subset_size]
     train_dataset = Subset(train_dataset, subset_indices)
 
-    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
+
     pin_memory = (args.dataset == "imagenet")
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=args.workers, pin_memory=pin_memory)
@@ -107,9 +114,6 @@ def main():
     model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method)
     _, model = model
 
-    if "vit" in args.arch:
-        global VIT
-        VIT = True
 
     if args.focal:
 
@@ -262,6 +266,14 @@ def main():
                 if name.startswith('norm'):
                     continue
 
+                param.requires_grad = False
+        elif tuning_method == 'compacter':
+            for name, param in model.named_parameters():
+                if name.startswith('head'):
+                    continue
+                
+                if 'tuning_module' in name:
+                    continue
                 param.requires_grad = False
 
         for name, param in model.named_parameters():
