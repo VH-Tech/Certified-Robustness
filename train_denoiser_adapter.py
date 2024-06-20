@@ -252,7 +252,7 @@ def main():
 
 
     model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
-    print("Training " +  str((count_parameters_trainable(model)/(count_parameters_trainable(model) + count_parameters_total(model)))*100)  +"% of the parameters")
+    print("Training " +  str((count_parameters_trainable(model)/(count_parameters_total(model)))*100)  +"% of the parameters")
     print("starting training")
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()

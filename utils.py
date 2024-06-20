@@ -17,8 +17,8 @@ def count_parameters_trainable(model):
         f.write(summery)
         f.write("\n Total Trainable Params:")
         f.write(str(total_params))
-    print(table)
-    print(f"Total Trainable Params: {total_params}")
+    # print(table)
+    # print(f"Total Trainable Params: {total_params}")
     return total_params
 
 
@@ -34,8 +34,8 @@ def count_parameters_total(model):
         f.write(summery)
         f.write("\n Total Trainable Params:")
         f.write(str(total_params))
-    print(table)
-    print(f"Total Params: {total_params}")
+    # print(table)
+    # print(f"Total Params: {total_params}")
     return total_params
 
 

@@ -1,7 +1,7 @@
 # this file is based on code publicly available at
 #   https://github.com/bearpaw/pytorch-classification
 # written by Wei Yang.
-from utils import count_parameters_total, count_parameters_trainable
+from utils import count_parameters_trainable, count_parameters_total
 from accelerate import Accelerator
 from architectures import CLASSIFIERS_ARCHITECTURES, get_architecture
 from datasets import get_dataset, DATASETS
@@ -134,7 +134,10 @@ def main():
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
-    
+    if args.tuning_method == 'full':
+        args.outdir = os.path.join(args.outdir, 'full_' + str(args.noise_sd))
+        os.makedirs(args.outdir, exist_ok=True)
+
     if args.resume and os.path.isfile(model_path):
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
@@ -147,9 +150,10 @@ def main():
         
     else:
         if args.resume: print("=> no checkpoint found at '{}'".format(args.outdir))
+        os.makedirs(args.outdir, exist_ok=True)
         init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
 
-    if args.tuning_method != 'full' and os.path.isfile(model_path):
+    if os.path.isfile(model_path):
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,map_location=lambda storage, loc: storage)
         model.load_state_dict(checkpoint['state_dict'], strict=False)
@@ -280,13 +284,13 @@ def main():
             if param.requires_grad:
                 print(f"{name} is trainable")
 
-        
     best = 0.0 
     if args.tuning_method != 'full':
         args.outdir = os.path.join(args.outdir, args.tuning_method, str(args.noise_sd), str(args.dataset_fraction))
         os.makedirs(args.outdir, exist_ok=True)
     
     print("training ", count_parameters_trainable(model)/count_parameters_total(model), " of parameters")
+
     wandb.init(
     # set the wandb project where this run will be logged
     project=args.arch+"_"+args.dataset+"_"+args.tuning_method+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd),

@@ -2,6 +2,33 @@ import os
 import shutil
 
 import torch
+from scipy import linalg
+from torch import nn
+
+class FourierMMLayer(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.dft_mat_seq = torch.tensor(linalg.dft(config['max_position_embeddings']))
+        self.dft_mat_hidden = torch.tensor(linalg.dft(config['hidden_size']))
+
+    def forward(self, hidden_states):
+        hidden_states_complex = hidden_states.type(torch.complex128)
+        return torch.einsum(
+            "...ij,...jk,...ni->...nk",
+            hidden_states_complex,
+            self.dft_mat_hidden,
+            self.dft_mat_seq
+        ).real.type(torch.float32)
+
+
+class FourierFFTLayer(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    @torch.cuda.amp.autocast(enabled=False)
+    def forward(self, hidden_states):
+        return torch.fft.fft(torch.fft.fft(hidden_states.float(), dim=-1), dim=-2).real
 
 
 def cosine_scheduler(base_value, final_value, epochs, niter_per_ep, warmup_epochs=0,
