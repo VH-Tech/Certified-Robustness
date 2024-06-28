@@ -110,11 +110,14 @@ def main():
                               num_workers=args.workers, pin_memory=pin_memory)
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
                              num_workers=args.workers, pin_memory=pin_memory)
+    
+    print("dataloaders created")
 
     model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method)
     _, model = model
 
-
+    print("model created")
+    
     if args.focal:
 
         class_frequency = torch.unique(torch.tensor(train_dataset.targets), return_counts=True)[1] if args.dataset == 'pneumonia' else train_dataset.get_frequency()
