@@ -216,7 +216,8 @@ class SwinTransformerBlock(nn.Module):
                                              act_layer=nn.GELU)
             
         if 'compacter' in self.tuning_config['method']:
-            self.tuning_module = Compacter(input_dim=dim)
+            self.tuning_module1 = Compacter(input_dim=dim)
+            self.tuning_module2 = Compacter(input_dim=dim)
             
 
     def forward(self, x):
@@ -264,14 +265,14 @@ class SwinTransformerBlock(nn.Module):
 
         if 'compacter' in self.tuning_config['method']:
             x_prev = x
-            x = self.tuning_module(x)
+            x = self.tuning_module1(x)
             x = x + x_prev
 
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         
         if 'compacter' in self.tuning_config['method']:
             x_prev = x
-            x = self.tuning_module(x)
+            x = self.tuning_module2(x)
             x = x + x_prev
         return x
 
