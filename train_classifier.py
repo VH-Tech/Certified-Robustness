@@ -84,7 +84,7 @@ def main():
         pass
     
     if not os.path.exists(args.outdir):
-        os.makedirs(args.outdir)
+        os.makedirs(args.outdir, exist_ok=True)
 
     # Copy code to output directory
     # copy_code(args.outdir)
