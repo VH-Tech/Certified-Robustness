@@ -114,7 +114,7 @@ def main():
     print("dataloaders created")
 
     model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method)
-    _, model = model
+    normalize_layer, model = model
 
     print("model created")
     
@@ -133,7 +133,7 @@ def main():
 
     optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
-    scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr/1000)
+    # scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr/1000)
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
@@ -303,6 +303,8 @@ def main():
     }
     )
     model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
+    # join normalization layer to model
+    model = torch.nn.Sequential(normalize_layer, model)
     model = model.cuda()
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()

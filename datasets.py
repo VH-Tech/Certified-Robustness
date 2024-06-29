@@ -97,7 +97,7 @@ def _cifar10(split: str, data_dir, model_input, do_norm) -> Dataset:
         transform = transforms.Compose([
             transforms.Resize(model_input),
             transforms.ToTensor(),
-            transforms.Normalize(mean=_CIFAR10_MEAN, std=_CIFAR10_STDDEV),
+            # transforms.Normalize(mean=_CIFAR10_MEAN, std=_CIFAR10_STDDEV),
             ])
     else:
         transform = transforms.Compose([
@@ -204,13 +204,14 @@ def _hyper(split: str, data_dir, noise_sd) -> Dataset:
                         transforms.RandomCrop(224), 
                         transforms.RandomHorizontalFlip(), 
                         transforms.ToTensor(),
-                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV)]), noise_sd=noise_sd)
+                        # transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV)
+                        ]), noise_sd=noise_sd)
     
     elif split == "test":
         return Hyper(root=data_dir, train=False, transform=transforms.Compose([
                         transforms.Resize((224,224)),
                         transforms.ToTensor(),
-                        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV),
+                        # transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV),
                         ]), noise_sd=noise_sd)
 
 class NormalizeLayer(torch.nn.Module):
