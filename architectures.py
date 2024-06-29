@@ -42,7 +42,7 @@ IMAGENET_CLASSIFIERS = [
                         'resnet34', 
                         'resnet50',
                         "google/vit-base-patch16-224-in21k",
-                        "vit"
+                        "vit", "vit_custom"
                         ]
 
 CIFAR10_CLASSIFIERS = [
@@ -216,6 +216,10 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tu
         # Load the model, specifying the cache directory
         model = ViTForImageClassification.from_pretrained("aaraki/vit-base-patch16-224-in21k-finetuned-cifar10", num_labels=get_num_classes(dataset), cache_dir=cache_directory)
         model = model.cuda()
+
+    elif arch == "vit_custom":
+        model = VisionTransformer(config=CONFIGS['ViT-B_16'], img_size=224, num_classes=get_num_classes(dataset), zero_head=True)
+        model.load_from(np.load("archs/weights/ViT-B_16-224.npz"))
 
     #Swin
     elif arch == "swin" :
