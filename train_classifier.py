@@ -364,7 +364,9 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
         # compute output
         outputs = model(inputs)
         if VIT == True :
-            outputs = outputs.logits
+            # print(outputs)
+            outputs = outputs[0]
+            # outputs = outputs.logits
         
         # print(outputs.shape, targets.shape)
         
@@ -429,7 +431,8 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
             # compute output
             outputs = model(inputs)
             if VIT == True :
-                outputs = outputs.logits
+                # outputs = outputs.logits
+                outputs = outputs[0]
                 
             loss = criterion(outputs, targets)
 

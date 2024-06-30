@@ -1,3 +1,3 @@
-CUDA_VISIBLE_DEVICES=0,1 accelerate launch train_classifier.py --dataset cifar10 --arch swin --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/swin --batch 32 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10 --lr 5e-4 --epochs 10 --workers 6
+CUDA_VISIBLE_DEVICES=0,1 accelerate launch train_classifier.py --dataset cifar10 --arch vit_custom --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/vit_custom --batch 64 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10 --lr 1e-3 --workers 8 --epochs 20
 
-CUDA_VISIBLE_DEVICES=0,1 accelerate launch train_classifier.py --dataset cifar10 --arch resnet50 --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/resnet50 --batch 4096 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10 --workers 6
+CUDA_VISIBLE_DEVICES=0,1 accelerate launch train_classifier.py --dataset hyper --arch vit_custom --outdir /scratch/ravihm.scee.iitmandi/models/hyper/vit_custom --batch 64 --data_dir /scratch/ravihm.scee.iitmandi/dataset/hyper --lr 1e-3 --workers 8 --epochs 20

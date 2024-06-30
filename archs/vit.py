@@ -17,8 +17,8 @@ from torch.nn import CrossEntropyLoss, Dropout, Softmax, Linear, Conv2d, LayerNo
 from torch.nn.modules.utils import _pair
 from scipy import ndimage
 
-import configs as configs
-
+#import everything from .configs
+from .configs import *
 from .modeling_resnet import ResNetV2
 
 
@@ -337,11 +337,11 @@ class VisionTransformer(nn.Module):
 
 
 CONFIGS = {
-    'ViT-B_16': configs.get_b16_config(),
-    'ViT-B_32': configs.get_b32_config(),
-    'ViT-L_16': configs.get_l16_config(),
-    'ViT-L_32': configs.get_l32_config(),
-    'ViT-H_14': configs.get_h14_config(),
-    'R50-ViT-B_16': configs.get_r50_b16_config(),
-    'testing': configs.get_testing(),
+    'ViT-B_16': get_b16_config(),
+    'ViT-B_32': get_b32_config(),
+    'ViT-L_16': get_l16_config(),
+    'ViT-L_32': get_l32_config(),
+    'ViT-H_14': get_h14_config(),
+    'R50-ViT-B_16': get_r50_b16_config(),
+    'testing': get_testing(),
 }
