@@ -20,7 +20,7 @@ from scipy import ndimage
 #import everything from .configs
 from .configs import *
 from .modeling_resnet import ResNetV2
-
+from .tuning_modules import Compacter
 
 logger = logging.getLogger(__name__)
 
@@ -169,23 +169,35 @@ class Embeddings(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, config, vis):
+    def __init__(self, config, vis, tuning_mode="full"):
         super(Block, self).__init__()
         self.hidden_size = config.hidden_size
         self.attention_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn = Mlp(config)
         self.attn = Attention(config, vis)
+        self.tuning_mode = tuning_mode
+        if tuning_mode == "compacter":
+            self.tuning_module1 = Compacter(input_dim=config.hidden_size)
+            self.tuning_module2 = Compacter(input_dim=config.hidden_size)
 
     def forward(self, x):
         h = x
         x = self.attention_norm(x)
         x, weights = self.attn(x)
+        if self.tuning_mode == "compacter":
+            x_prev = x
+            x = self.tuning_module1(x)
+            x = x + x_prev
         x = x + h
 
         h = x
         x = self.ffn_norm(x)
         x = self.ffn(x)
+        if self.tuning_mode == "compacter":
+            x_prev = x
+            x = self.tuning_module2(x)
+            x = x + x_prev
         x = x + h
         return x, weights
 
@@ -228,13 +240,13 @@ class Block(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, config, vis):
+    def __init__(self, config, vis, tuning_mode="full"):
         super(Encoder, self).__init__()
         self.vis = vis
         self.layer = nn.ModuleList()
         self.encoder_norm = LayerNorm(config.hidden_size, eps=1e-6)
         for _ in range(config.transformer["num_layers"]):
-            layer = Block(config, vis)
+            layer = Block(config, vis, tuning_mode=tuning_mode)
             self.layer.append(copy.deepcopy(layer))
 
     def forward(self, hidden_states):
@@ -248,10 +260,10 @@ class Encoder(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, config, img_size, vis):
+    def __init__(self, config, img_size, vis, tuning_mode="full"):
         super(Transformer, self).__init__()
         self.embeddings = Embeddings(config, img_size=img_size)
-        self.encoder = Encoder(config, vis)
+        self.encoder = Encoder(config, vis, tuning_mode=tuning_mode)
 
     def forward(self, input_ids):
         embedding_output = self.embeddings(input_ids)
@@ -260,13 +272,13 @@ class Transformer(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    def __init__(self, config, img_size=224, num_classes=21843, zero_head=False, vis=False):
+    def __init__(self, config, img_size=224, num_classes=21843, zero_head=False, vis=False, tuning_mode="full"):
         super(VisionTransformer, self).__init__()
         self.num_classes = num_classes
         self.zero_head = zero_head
         self.classifier = config.classifier
 
-        self.transformer = Transformer(config, img_size, vis)
+        self.transformer = Transformer(config, img_size, vis, tuning_mode=tuning_mode)
         self.head = Linear(config.hidden_size, num_classes)
 
     def forward(self, x, labels=None):

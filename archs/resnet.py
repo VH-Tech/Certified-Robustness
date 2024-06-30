@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from .tuning_modules import PadPrompter, ConvAdapter, LinearAdapter, ProgramModule
+from .tuning_modules import PadPrompter, ConvAdapter, LinearAdapter, ProgramModule, Compacter
 
 __all__ = [
     'resnet18',
@@ -78,12 +78,25 @@ class BasicBlock(nn.Module):
                                              groups=inplanes // tuning_config['adapt_size'], 
                                              dilation=1,
                                              act_layer=nn.ReLU)
+            
+        if 'compacter' in self.tuning_config['method']:
+            self.tuning_module = Compacter()
 
     def forward(self, x: Tensor) -> Tensor:
         identity = x
 
         if 'conv_adapt' in self.tuning_config['method']:
             out_adapt = self.tuning_module(out)
+
+        if 'compacter' in self.tuning_config['method']:
+            # save the shape of tensor
+            shape = x.shape
+            #flatten the input for compacter
+            x = x.view(x.size(0), -1)
+            x = self.tuning_module(x)
+            #reshape the tensor to original shape
+            out_adapt = x.view(shape)
+
         out = self.conv1(x)
         if 'conv_adapt' in self.tuning_config['method']:
             out = out + out_adapt

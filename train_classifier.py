@@ -45,18 +45,12 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,
                     metavar='W', help='weight decay (default: 5e-4)')
-parser.add_argument('--gpu', default=None, type=str,
-                    help='id(s) for CUDA_VISIBLE_DEVICES')
 parser.add_argument('--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--noise_sd', default=0.0, type=float,
                     help="standard deviation of noise distribution for data augmentation")
 parser.add_argument('--resume', action='store_true',
                     help='if true, tries to resume training from an existing checkpoint')
-parser.add_argument('--azure_datastore_path', type=str, default='',
-                    help='Path to imagenet on azure')
-parser.add_argument('--philly_imagenet_path', type=str, default='',
-                    help='Path to imagenet on philly')
 parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
 parser.add_argument('--data_dir', type=str, default='./data',
@@ -79,9 +73,6 @@ torch.cuda.manual_seed_all(0)
 VIT = False
 
 def main():
-    if args.gpu:
-        # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-        pass
     
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir, exist_ok=True)
