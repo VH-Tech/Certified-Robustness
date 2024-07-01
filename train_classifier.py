@@ -63,11 +63,6 @@ args = parser.parse_args()
 
 accelerator = Accelerator()
 
-if args.azure_datastore_path:
-    os.environ['IMAGENET_DIR_AZURE'] = os.path.join(args.azure_datastore_path, 'datasets/imagenet_zipped')
-if args.philly_imagenet_path:
-    os.environ['IMAGENET_DIR_PHILLY'] = os.path.join(args.philly_imagenet_path, './')
-
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
 VIT = False
