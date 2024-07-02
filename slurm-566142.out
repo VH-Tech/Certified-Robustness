@@ -1,0 +1,73 @@
+==========================================
+SLURM_CLUSTER_NAME = paramhimalaya
+SLURM_ARRAY_JOB_ID = 
+SLURM_ARRAY_TASK_ID = 
+SLURM_ARRAY_TASK_COUNT = 
+SLURM_ARRAY_TASK_MAX = 
+SLURM_ARRAY_TASK_MIN = 
+SLURM_JOB_ACCOUNT = iitmandi
+SLURM_JOB_ID = 566142
+SLURM_JOB_NAME = cifar-Certified-Robustness.job
+SLURM_JOB_NODELIST = gpu005
+SLURM_JOB_USER = ravihm.scee.iitmandi
+SLURM_JOB_UID = 46161
+SLURM_JOB_PARTITION = gpu
+SLURM_TASK_PID = 32656
+SLURM_SUBMIT_DIR = /home/ravihm.scee.iitmandi/Certified-Robustness
+SLURM_CPUS_ON_NODE = 1
+SLURM_NTASKS = 
+SLURM_TASK_PID = 32656
+==========================================
+
+CommandNotFoundError: Your shell has not been properly configured to use 'conda activate'.
+To initialize your shell, run
+
+    $ conda init <SHELL_NAME>
+
+Currently supported shells are:
+  - bash
+  - fish
+  - tcsh
+  - xonsh
+  - zsh
+  - powershell
+
+See 'conda init --help' for more information and options.
+
+IMPORTANT: You may need to close and restart your shell after running 'conda init'.
+
+
+/var/share/slurm/d/job566142/slurm_script: line 15: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 17: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 19: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 21: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 23: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 25: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 27: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 29: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 31: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 33: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 35: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 37: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 39: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 41: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 43: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 45: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 47: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 49: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 51: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 53: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 55: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 57: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 59: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 61: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 63: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 65: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 68: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 70: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 72: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 74: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 76: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 78: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 80: accelerate: command not found
+/var/share/slurm/d/job566142/slurm_script: line 82: accelerate: command not found

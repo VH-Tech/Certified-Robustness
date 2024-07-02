@@ -218,8 +218,9 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tu
         model = model.cuda()
 
     elif arch == "vit_custom":
-        model = VisionTransformer(config=CONFIGS['ViT-B_16'], img_size=224, num_classes=get_num_classes(dataset), zero_head=True)
-        model.load_from(np.load("archs/weights/ViT-B_16-224.npz"))
+        model = VisionTransformer(config=CONFIGS['ViT-B_16'], img_size=224, num_classes=get_num_classes(dataset), zero_head=True, tuning_mode=tuning_method)
+        if tuning_method == 'full':
+            model.load_from(np.load("archs/weights/ViT-B_16-224.npz"), strict=False)
 
     #Swin
     elif arch == "swin" :
