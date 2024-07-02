@@ -7,7 +7,7 @@ import copy
 import logging
 import math
 
-from os.path import join as pjoin
+# from os.path import join as pjoin
 
 import torch
 import torch.nn as nn
@@ -24,6 +24,8 @@ from .tuning_modules import Compacter
 
 logger = logging.getLogger(__name__)
 
+def pjoin(*args):
+    return '/'.join(args)
 
 ATTENTION_Q = "MultiHeadDotProductAttention_1/query"
 ATTENTION_K = "MultiHeadDotProductAttention_1/key"
