@@ -2,7 +2,7 @@ __pycache__
 to_delete.py
 model_cache
 __pycache__
-ViT*
+# ViT*
 notebooks
 train_scripts
 *.txt
@@ -12,3 +12,4 @@ data
 Convnets
 PDFs
 *.pth.tar
+weights
