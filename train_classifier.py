@@ -104,7 +104,7 @@ def main():
 
     model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method)
     normalize_layer, model = model
-
+    # print(model(torch.randn(1, 3, 224, 224)).shape)
     print("model created")
     
     if args.focal:
@@ -352,7 +352,7 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
         # compute output
         outputs = model(inputs)
-        if VIT == True :
+        if args.arch == "vit_custom" :
             # print(outputs)
             outputs = outputs[0]
             # outputs = outputs.logits
@@ -419,7 +419,7 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
 
             # compute output
             outputs = model(inputs)
-            if VIT == True :
+            if args.arch == "vit_custom" :
                 # outputs = outputs.logits
                 outputs = outputs[0]
                 

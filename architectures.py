@@ -223,7 +223,7 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tu
             model.load_from(np.load("archs/weights/ViT-B_16-224.npz"))
 
     elif arch == "vit_kaggle" :
-        model = ViT(image_size=224, patch_size=32, num_classes=get_num_classes(dataset), dim=1024, depth=6, heads=16, mlp_dim=2048, dropout=0.1, emb_dropout=0.1, tuning_mode=tuning_method)
+        model = ViT(image_size=224, patch_size=16, num_classes=10, dim=512, depth=6, heads=8, mlp_dim=1024, dropout=0.1, emb_dropout=0.1, tuning_mode=tuning_method)
 
     #Swin
     elif arch == "swin" :

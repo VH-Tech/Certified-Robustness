@@ -15,7 +15,7 @@ def pair(t):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout = 0., tuning_mode=None):
         super().__init__()
-
+        self.tuning_mode = tuning_mode
         if tuning_mode == "compacter":
             self.tuning_module1 = Compacter(input_dim=dim)
             self.tuning_module2 = Compacter(input_dim=dim)
@@ -34,7 +34,6 @@ class FeedForward(nn.Module):
             return self.tuning_module2(self.net(self.tuning_module1(x)))
         else:
             return self.net(x)
-
 
 class Attention(nn.Module):
     def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
