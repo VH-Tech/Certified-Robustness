@@ -222,6 +222,9 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tu
         if tuning_method == 'full':
             model.load_from(np.load("archs/weights/ViT-B_16-224.npz"))
 
+    elif arch == "vit_kaggle" :
+        model = ViT(image_size=224, patch_size=32, num_classes=get_num_classes(dataset), dim=1024, depth=6, heads=16, mlp_dim=2048, dropout=0.1, emb_dropout=0.1, tuning_mode=tuning_method)
+        
     #Swin
     elif arch == "swin" :
         tuning_config = {"method" : tuning_method, "adapt_size" : 8, "adapt_scale" : 1.0, "kernel_size" : 3}

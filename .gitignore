@@ -11,3 +11,4 @@ data
 *.ipynb
 Convnets
 PDFs
+*.pth.tar
