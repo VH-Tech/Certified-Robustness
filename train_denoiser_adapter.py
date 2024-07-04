@@ -18,7 +18,7 @@ from utils import count_parameters_total, count_parameters_trainable
 import numpy as np
 from transformers import TrainingArguments, EvalPrediction
 from adapters import AdapterTrainer
-
+import torch.nn as nn
 from torch.utils.data import Dataset
 import json
 import adapters
@@ -85,14 +85,90 @@ parser.add_argument('--ssl_like', type=int, default=0,
 parser.add_argument('--do_norm', type=int, default=1, 
                     help='do ssl like criterion')
 
-args = parser.parse_args()
 
+parser.add_argument('--do_fourier', type=int, default=0, 
+                    help='do fourier transform before vit layer')
+parser.add_argument('--gap', type=int, default=1)
+parser.add_argument('--fourier_location', type=str, default='attention', 
+                    help='location', choices=['attention', 'adapter'])
+parser.add_argument('--invert_domain', type=int, default=0, 
+                    help='invert domain after output')
+
+args = parser.parse_args()
 
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
 
 global VIT
 VIT = True
+
+# Step 1: Define the Fourier Transform Layer
+class FourierTransformLayer(nn.Module):
+    def __init__(self):
+        super(FourierTransformLayer, self).__init__()
+
+    def forward(self, hidden_states):
+        return torch.fft.fft(torch.fft.fft(hidden_states.float(), dim=-1), dim=-2).real
+class InverseFourierTransformLayer(nn.Module):
+    def __init__(self):
+        super(InverseFourierTransformLayer, self).__init__()
+
+    def forward(self, hidden_states):
+        return torch.fft.ifft(torch.fft.ifft(hidden_states.float(), dim=-1), dim=-2).real
+# Step 2: Create the Wrapper Class
+class ViTLayerWithFourierTransform(nn.Module):
+    def __init__(self, original_layer):
+        super(ViTLayerWithFourierTransform, self).__init__()
+        self.fourier_transform = FourierTransformLayer()
+        self.original_layer = original_layer
+
+    def forward(self, hidden_states, *args, **kwargs):
+        # Apply the Fourier Transform before the original layer
+        hidden_states = self.fourier_transform(hidden_states)
+        # Apply the original layer
+        hidden_states = self.original_layer(hidden_states)
+        return hidden_states
+class AdapterWithFourierTransform(nn.Module):
+    def __init__(self, original_layer):
+        super(AdapterWithFourierTransform, self).__init__()
+        self.fourier_transform = FourierTransformLayer()
+        self.original_layer = original_layer
+        # self.inverse_fourier_transform = InverseFourierTransformLayer()
+
+    def bottleneck_layer_forward(self, hidden_states, *args, **kwargs):
+        # Apply the Fourier Transform before the original layer
+        hidden_states = self.fourier_transform(hidden_states)
+        # Apply the original layer
+        hidden_states = self.original_layer(hidden_states, *args, **kwargs)
+        return hidden_states
+    
+    def forward(self, hidden_states, *args, **kwargs):
+        # Apply the Fourier Transform before the original layer
+        hidden_states = self.fourier_transform(hidden_states)
+        # Apply the original layer
+        hidden_states = self.original_layer(hidden_states, *args, **kwargs)
+        return hidden_states
+    
+def add_fourier_transform_to_adapters(model, gap=1):
+    for i in range(len(model.vit.encoder.layer)):
+        if (i) % gap == 0:
+            original_layer = model.vit.encoder.layer[i].output.output_adapters
+            model.vit.encoder.layer[i].output.output_adapters = AdapterWithFourierTransform(original_layer)
+
+            original_layer2 = model.vit.encoder.layer[0].attention_adapters
+            model.vit.encoder.layer[i].attention_adapters = AdapterWithFourierTransform(original_layer2)
+
+    return model
+
+# Step 3: Replace the Existing Layers in the Model
+def add_fourier_transform_to_vit(model, gap=1):
+    for i in range(len(model.vit.encoder.layer)):
+        if (i) % gap == 0:
+            original_layer = model.vit.encoder.layer[i]
+            model.vit.encoder.layer[i] = ViTLayerWithFourierTransform(original_layer)
+
+    return model
+
 
 def main():
     if args.gpu:
@@ -225,7 +301,16 @@ def main():
     #set active adapter
     model.set_active_adapters("denoising-adapter")
     model.train_adapter("denoising-adapter")
-    # model = torch.nn.Sequential(normalize_layer, model)
+
+    if args.do_fourier:
+        if args.fourier_location == 'attention':
+            model = add_fourier_transform_to_vit(model.vit, gap=args.gap)
+        else:
+            model = add_fourier_transform_to_adapters(model, gap=1)
+
+    if args.dataset not in ["cifar10", "imagenet"]:
+        model = torch.nn.Sequential(normalize_layer, model)
+
     model.to('cuda')
     optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
@@ -278,8 +363,8 @@ def main():
             # normalize_layer, model = model
 
             # Save adapter
-            # model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
-            # model = torch.nn.Sequential(normalize_layer, model)
+            model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
+            model = torch.nn.Sequential(normalize_layer, model)
             torch.save({
                 'epoch': epoch + 1,
                 'arch': args.arch,
