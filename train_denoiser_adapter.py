@@ -49,6 +49,9 @@ parser.add_argument('--batch', default=256, type=int, metavar='N',
                     help='batchsize (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     help='initial learning rate', dest='lr')
+
+parser.add_argument('--scheduler', default='cosine', type=str, choices=['cosine', 'step'])
+
 parser.add_argument('--lr_step_size', type=int, default=30,
                     help='How often to decrease learning by gamma.')
 parser.add_argument('--gamma', type=float, default=0.1,
@@ -114,20 +117,25 @@ class InverseFourierTransformLayer(nn.Module):
     def __init__(self):
         super(InverseFourierTransformLayer, self).__init__()
 
-    def forward(self, hidden_states):
-        return torch.fft.ifft(torch.fft.ifft(hidden_states.float(), dim=-1), dim=-2).real
+    def forward(self, hidden_states, *args, **kwargs):
+        # print(hidden_states)
+        return (torch.fft.ifft(torch.fft.ifft(hidden_states[0], dim=-1), dim=-2).real, )
 # Step 2: Create the Wrapper Class
 class ViTLayerWithFourierTransform(nn.Module):
-    def __init__(self, original_layer):
+    def __init__(self, original_layer, do_invert=False):
         super(ViTLayerWithFourierTransform, self).__init__()
         self.fourier_transform = FourierTransformLayer()
         self.original_layer = original_layer
+        self.inverse_fourier_transform = InverseFourierTransformLayer()
+        self.do_invert = do_invert
 
     def forward(self, hidden_states, *args, **kwargs):
         # Apply the Fourier Transform before the original layer
         hidden_states = self.fourier_transform(hidden_states)
         # Apply the original layer
         hidden_states = self.original_layer(hidden_states)
+        if self.do_invert:
+            hidden_states = self.inverse_fourier_transform(hidden_states)
         return hidden_states
 class AdapterWithFourierTransform(nn.Module):
     def __init__(self, original_layer):
@@ -166,7 +174,7 @@ def add_fourier_transform_to_vit(model, gap=1):
     for i in range(len(model.vit.encoder.layer)):
         if (i) % gap == 0:
             original_layer = model.vit.encoder.layer[i]
-            model.vit.encoder.layer[i] = ViTLayerWithFourierTransform(original_layer)
+            model.vit.encoder.layer[i] = ViTLayerWithFourierTransform(original_layer, args.invert_domain)
 
     return model
 
@@ -210,7 +218,7 @@ def main():
 
     folder += "_"+str(args.dataset_fraction)
     if not os.path.exists(args.outdir+folder+"/"+str(args.noise_sd)):
-        os.makedirs(args.outdir+folder+"/"+str(args.noise_sd))
+        os.makedirs(args.outdir+folder+"/"+str(args.noise_sd), exist_ok=True)
 
     if args.do_norm == 0:
         args.do_norm = False
@@ -305,7 +313,7 @@ def main():
 
     if args.do_fourier:
         if args.fourier_location == 'attention':
-            model = add_fourier_transform_to_vit(model.vit, gap=args.gap)
+            model = add_fourier_transform_to_vit(model, gap=args.gap)
         else:
             model = add_fourier_transform_to_adapters(model, gap=1)
 
@@ -314,8 +322,10 @@ def main():
 
     model.to('cuda')
     optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
-    scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr/1000)
+    if args.scheduler == 'step':
+        scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
+    if args.scheduler == 'cosine':
+        scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr/1000)
 
     if args.resume:
         optimizer.load_state_dict(checkpoint_adapter['optimizer'])
@@ -323,9 +333,15 @@ def main():
         for param_group in optimizer.param_groups:
             param_group['lr'] = args.lr
 
+    project_name = args.arch+"_"+args.dataset+"_"+args.adapter_config+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd)
+    if args.do_fourier:
+        project_name += "_fourier_"+args.fourier_location
+        if args.invert_domain:
+            project_name += "_invert"
+
     wandb.init(
     # set the wandb project where this run will be logged
-    project=args.arch+"_"+args.dataset+"_"+args.adapter_config+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd),
+    project=project_name,
 
     # track hyperparameters and run metadata
     config={
@@ -361,7 +377,7 @@ def main():
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
-            # normalize_layer, model = model
+            normalize_layer, model = model
 
             # Save adapter
             model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
