@@ -279,18 +279,18 @@ def main():
         os.makedirs(args.outdir, exist_ok=True)
     
     print("training ", count_parameters_trainable(model)/count_parameters_total(model), " of parameters")
-    # wandb.init(
-    # # set the wandb project where this run will be logged
-    # project=args.arch+"_"+args.dataset+"_"+args.tuning_method+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd),
+    wandb.init(
+    # set the wandb project where this run will be logged
+    project=args.arch+"_"+args.dataset+"_"+args.tuning_method+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd),
 
-    # # track hyperparameters and run metadata
-    # config={
-    # "learning_rate": args.lr,
-    # "architecture": args.arch,
-    # "dataset": args.dataset,
-    # "epochs": args.epochs,
-    # }
-    # )
+    # track hyperparameters and run metadata
+    config={
+    "learning_rate": args.lr,
+    "architecture": args.arch,
+    "dataset": args.dataset,
+    "epochs": args.epochs,
+    }
+    )
     model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
     # join normalization layer to model
     model = torch.nn.Sequential(normalize_layer, model)
@@ -316,7 +316,7 @@ def main():
                 'optimizer': optimizer.state_dict(),
             }, os.path.join(args.outdir, 'checkpoint.pth.tar'))
 
-        # wandb.log({"train_loss": train_loss, "test_loss": test_loss, "train_acc": train_acc, "test_acc": test_acc, "best" : best, "lr" : scheduler.get_lr()[0]})
+        wandb.log({"train_loss": train_loss, "test_loss": test_loss, "train_acc": train_acc, "test_acc": test_acc, "best" : best, "lr" : scheduler.get_lr()[0]})
         
 
 def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
