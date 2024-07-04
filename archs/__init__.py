@@ -15,3 +15,6 @@ from .efficientnet import *
 from .swin_transformer import * 
 from .vit import *
 from .vit_kaggle import *
+from .tuning_modules import *
+from .modeling_resnet import *
+from .configs import *

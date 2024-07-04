@@ -1,7 +1,7 @@
 from .prompter import PadPrompter
 from .conv_adapter import ConvAdapter, LinearAdapter
 from .program_module import ProgramModule
-from .compacter import Compacter
+from .compacter import Compacter, HyperComplexAdapter
 
 def set_tuning_config(tuning_method, args):
     tuning_config = None

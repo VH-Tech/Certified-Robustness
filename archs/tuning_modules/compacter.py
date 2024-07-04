@@ -1,7 +1,7 @@
 """Implements an Adapter, Low-rank adapters and Hyper-adapter Layers."""
 import torch.nn as nn
 from .adapter_utils import Activations
-from .hypercomplex.layers import PHMLinear
+from .hypercomplex.layers import PHMLinear, PHMLayer
 from .low_rank_layer import LowRankLinear
 
 
@@ -59,7 +59,7 @@ class HyperComplexAdapter(nn.Module):
         self.input_dim = config.input_dim #*
         self.down_sample_size = self.input_dim // config.reduction_factor
         self.activation = Activations(config.non_linearity.lower())
-        self.down_sampler = PHMLinear(in_features=self.input_dim, #
+        self.down_sampler = PHMLayer(in_features=self.input_dim, #
                                       out_features=self.down_sample_size, #
                                       bias=True, #
                                       c_init=config.phm_c_init, #
@@ -73,7 +73,7 @@ class HyperComplexAdapter(nn.Module):
                                       phm_rank=config.phm_rank, #
                                       phm_init_range=config.phm_init_range,#
                                       kronecker_prod=config.kronecker_prod)#*
-        self.up_sampler = PHMLinear(in_features=self.down_sample_size,
+        self.up_sampler = PHMLayer(in_features=self.down_sample_size,
                                     out_features=self.input_dim, 
                                     bias=True,
                                     c_init=config.phm_c_init,
