@@ -99,13 +99,13 @@ class Compacter(nn.Module):
         self.config = lambda: None
         self.config.input_dim = input_dim #*
         self.config.reduction_factor = 32 #
-        self.config.non_linearity = "gelu_new" #
+        self.config.non_linearity = "gelu" #
         self.config.phm_c_init = "normal" #
         self.config.hypercomplex_division = 4 #
         self.config.learn_phm = True #
         self.config.hypercomplex_nonlinearity = "glorot-uniform" #
         self.config.shared_phm_rule = False #
-        self.config.factorized_phm = False #
+        self.config.factorized_phm = True
         self.config.shared_W_phm = False #*
         self.config.factorized_phm_rule = False #
         self.config.phm_rank = 1 #
