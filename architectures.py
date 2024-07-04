@@ -60,7 +60,7 @@ DENOISERS_ARCHITECTURES = ["cifar_dncnn", "cifar_dncnn_wide", "memnet", # cifar1
                             'imagenet_dncnn', 'imagenet_memnet' # imagenet denoisers
                         ]
 
-def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tuning_method: str = "full") -> torch.nn.Module:
+def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tuning_method: str = "full", pretrained_weights=None) -> torch.nn.Module:
     """ Return a neural network (with random weights)
 
     :param arch: the architecture - should be in the ARCHITECTURES list above
@@ -220,7 +220,10 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tu
     elif arch == "vit_custom":
         model = VisionTransformer(config=CONFIGS['ViT-B_16'], img_size=224, num_classes=get_num_classes(dataset), zero_head=True, tuning_mode=tuning_method)
         if tuning_method == 'full':
-            model.load_from(np.load("archs/weights/ViT-B_16-224.npz"))
+            if pretrained_weights is not None:
+                model.load_from(np.load(pretrained_weights))
+            else :
+                model.load_from(np.load("archs/weights/ViT-B_16-224.npz"))
 
     elif arch == "vit_kaggle" :
         model = ViT(image_size=224, patch_size=16, num_classes=10, dim=512, depth=6, heads=8, mlp_dim=1024, dropout=0.1, emb_dropout=0.1, tuning_mode=tuning_method)
