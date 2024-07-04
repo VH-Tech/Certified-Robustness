@@ -3,10 +3,10 @@ import torch
 import torch.nn as nn
 from typing import Union, Optional
 import torch.nn.functional as F
-
+import functools
 from .inits import glorot_uniform, glorot_normal  #phm_init
 from .kronecker import kronecker_product, kronecker_product_einsum_batched
-
+import threading
 
 def matvec_product(W: torch.Tensor, x: torch.Tensor,
                        bias: Optional[torch.Tensor],
@@ -31,6 +31,89 @@ def matvec_product(W: torch.Tensor, x: torch.Tensor,
     if bias is not None:
         y += bias
     return y
+
+class ForwardContext:
+    """
+    Holds context information during a forward pass through a model. This class should be used via the
+    ``ForwardContext.wrap()`` method.
+
+    Note that the context is thread-local.
+    """
+
+    # thread-local storage that holds a stack of active contexts
+    storage = threading.local()
+
+    context_attributes = [
+        "adapter_gating_scores",
+        "adapter_fusion_attentions",
+        "adapter_input_parallelized",
+    ]
+    # Additional used attributes not exposed to the user
+    # - prompt_tokens_length: length of the prompt tokens
+
+    def __init__(self, model, *args, **kwargs):
+        # If the model has a method ``forward_context()``, use it to create the context.
+        if hasattr(model, "forward_context"):
+            model.forward_context(self, *args, **kwargs)
+
+    def __enter__(self):
+        ForwardContext.get_contexts().append(self)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        ForwardContext.get_contexts().pop()
+
+    @classmethod
+    def wrap(cls, f):
+        """
+        Decorator method that wraps a ``forward()`` function of a model class.
+        """
+
+        @functools.wraps(f)
+        def wrapper_func(self, *args, **kwargs):
+            if self.adapters_config is not None:
+                with cls(self, *args, **kwargs) as ctx:
+                    # whether to output the context attributes
+                    output_context = kwargs.pop("output_context", False)
+                    kwargs = {
+                        k: v for k, v in kwargs.items() if k.replace("output_", "") not in cls.context_attributes
+                    }
+                    results = f(self, *args, **kwargs)
+
+                    # append output attributes
+                    if isinstance(results, tuple):
+                        for attr in cls.context_attributes:
+                            if getattr(ctx, "output_" + attr, False):
+                                results = results + (dict(getattr(ctx, attr)),)
+                    else:
+                        for attr in cls.context_attributes:
+                            if getattr(ctx, "output_" + attr, False):
+                                results[attr] = dict(getattr(ctx, attr))
+
+                    if output_context:
+                        context_dict = ctx.__dict__
+
+                if output_context:
+                    return results, context_dict
+                else:
+                    return results
+            else:
+                return f(self, *args, **kwargs)
+
+        return wrapper_func
+
+    @classmethod
+    def get_contexts(cls):
+        if not hasattr(cls.storage, "contexts"):
+            cls.storage.contexts = []
+        return cls.storage.contexts
+
+    @classmethod
+    def get_context(cls):
+        try:
+            return cls.get_contexts()[-1]
+        except IndexError:
+            return None
 
 class PHMLayer(nn.Module):
     """
@@ -189,17 +272,28 @@ class PHMLayer(nn.Module):
             self.W = W
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        
-
-        if self.factorized_phm_W:
-            W = torch.bmm(self.W_left, self.W_right)
+        if self.shared_W_phm:
+            parameters = ForwardContext.get_context().shared_parameters[self.name]
+            if self.factorized_phm_W:
+                W = torch.bmm(parameters[f"W_{self.position}_left"], parameters[f"W_{self.position}_right"])
+            else:
+                W = parameters[f"W_{self.position}"]
         else:
-            W = self.W
-
-        if self.factorized_phm_rule:
-            phm_rule = torch.bmm(self.phm_rule_left, self.phm_rule_right)
+            if self.factorized_phm_W:
+                W = torch.bmm(self.W_left, self.W_right)
+            else:
+                W = self.W
+        if self.shared_phm_rule:
+            parameters = ForwardContext.get_context().shared_parameters[self.name]
+            if self.factorized_phm_rule:
+                phm_rule = torch.bmm(parameters["phm_rule_left"], parameters["phm_rule_right"])
+            else:
+                phm_rule = parameters["phm_rule"]
         else:
-            phm_rule = self.phm_rule
+            if self.factorized_phm_rule:
+                phm_rule = torch.bmm(self.phm_rule_left, self.phm_rule_right)
+            else:
+                phm_rule = self.phm_rule
 
         H = kronecker_product(phm_rule, W).sum(0)
 

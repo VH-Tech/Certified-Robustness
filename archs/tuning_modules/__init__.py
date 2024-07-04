@@ -2,7 +2,7 @@ from .prompter import PadPrompter
 from .conv_adapter import ConvAdapter, LinearAdapter
 from .program_module import ProgramModule
 from .compacter import Compacter, HyperComplexAdapter
-
+from .hypercomplex import ForwardContext
 def set_tuning_config(tuning_method, args):
     tuning_config = None
     if tuning_method == 'conv_adapt' or tuning_method == 'conv_adapt_norm' or tuning_method == 'conv_adapt_bias':

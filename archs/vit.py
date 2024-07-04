@@ -20,7 +20,7 @@ from scipy import ndimage
 #import everything from .configs
 from .configs import *
 from .modeling_resnet import ResNetV2
-from .tuning_modules import Compacter
+from .tuning_modules import Compacter, ForwardContext
 
 logger = logging.getLogger(__name__)
 
