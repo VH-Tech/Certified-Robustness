@@ -12,4 +12,6 @@ data
 Convnets
 PDFs
 *.pth.tar
+*.pdf
 weights
+slurm*

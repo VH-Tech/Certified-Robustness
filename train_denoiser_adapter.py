@@ -138,34 +138,39 @@ class ViTLayerWithFourierTransform(nn.Module):
             hidden_states = self.inverse_fourier_transform(hidden_states)
         return hidden_states
 class AdapterWithFourierTransform(nn.Module):
-    def __init__(self, original_layer):
+    def __init__(self, original_layer, do_invert=False):
         super(AdapterWithFourierTransform, self).__init__()
         self.fourier_transform = FourierTransformLayer()
         self.original_layer = original_layer
-        # self.inverse_fourier_transform = InverseFourierTransformLayer()
+        self.do_invert = do_invert
+        self.inverse_fourier_transform = InverseFourierTransformLayer()
 
     def bottleneck_layer_forward(self, hidden_states, *args, **kwargs):
         # Apply the Fourier Transform before the original layer
         hidden_states = self.fourier_transform(hidden_states)
         # Apply the original layer
         hidden_states = self.original_layer(hidden_states, *args, **kwargs)
+        if self.do_invert:
+            hidden_states = self.inverse_fourier_transform(hidden_states)
         return hidden_states
     
     def forward(self, hidden_states, *args, **kwargs):
         # Apply the Fourier Transform before the original layer
-        hidden_states = self.fourier_transform(hidden_states)
-        # Apply the original layer
-        hidden_states = self.original_layer(hidden_states, *args, **kwargs)
+        # hidden_states = self.fourier_transform(hidden_states)
+        # # Apply the original layer
+        # hidden_states = self.original_layer(hidden_states, *args, **kwargs)
+        # if self.do_invert:
+        #     hidden_states = self.inverse_fourier_transform(hidden_states)
         return hidden_states
     
 def add_fourier_transform_to_adapters(model, gap=1):
     for i in range(len(model.vit.encoder.layer)):
         if (i) % gap == 0:
             original_layer = model.vit.encoder.layer[i].output.output_adapters
-            model.vit.encoder.layer[i].output.output_adapters = AdapterWithFourierTransform(original_layer)
+            model.vit.encoder.layer[i].output.output_adapters = AdapterWithFourierTransform(original_layer, do_invert=args.invert_domain)
 
             original_layer2 = model.vit.encoder.layer[0].attention_adapters
-            model.vit.encoder.layer[i].attention_adapters = AdapterWithFourierTransform(original_layer2)
+            model.vit.encoder.layer[i].attention_adapters = AdapterWithFourierTransform(original_layer2, do_invert=args.invert_domain)
 
     return model
 
@@ -377,11 +382,11 @@ def main():
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
-            normalize_layer, model = model
+            # normalize_layer, model = model
 
-            # Save adapter
-            model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
-            model = torch.nn.Sequential(normalize_layer, model)
+            # # Save adapter
+            # model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
+            # model = torch.nn.Sequential(normalize_layer, model)
             torch.save({
                 'epoch': epoch + 1,
                 'arch': args.arch,
