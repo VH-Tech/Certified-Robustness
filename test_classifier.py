@@ -99,8 +99,7 @@ def main():
                              num_workers=args.workers, pin_memory=pin_memory)
 
     model = get_architecture(args.arch, args.dataset)
-    _ , model = model
-
+    normalize_layer, model = model
     if "vit" in args.arch:
         global VIT
         VIT = True
@@ -115,7 +114,7 @@ def main():
         criterion = CrossEntropyLoss().cuda()
 
     ## Load Weights if required
-    if args.dataset not in ["imagenet","hyper"]:
+    if args.dataset not in ["imagenet","cifar10"]:
         model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
         if os.path.isfile(model_path):
             print("=> loading checkpoint '{}'".format(model_path))
@@ -144,11 +143,12 @@ def main():
         folder += "_"+args.adapter_config
         folder += "_"+str(args.dataset_fraction)
         adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
-        normalize_layer, model = model
+        
         adapters.init(model)
         model.load_adapter(adapter_path)
         model.set_active_adapters("denoising-adapter")
     # normalize_layer, model = model
+    model = torch.nn.Sequential(normalize_layer, model)
     model.to('cuda')
     test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
     print(test_loss, test_acc)

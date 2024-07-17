@@ -7,6 +7,7 @@ from architectures import CLASSIFIERS_ARCHITECTURES, get_architecture
 from datasets import get_dataset, DATASETS
 from loss import FocalLoss
 from torch.nn import CrossEntropyLoss
+import torch.nn as nn
 from torch.optim import SGD, Optimizer
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 from torch.utils.data import DataLoader
@@ -95,6 +96,7 @@ def main():
 
 
     pin_memory = (args.dataset == "imagenet")
+    print("creating train dataloader with dataset of size : ",len(train_dataset))
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=args.workers, pin_memory=pin_memory)
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
@@ -309,6 +311,9 @@ def main():
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
+            if isinstance(model, nn.DataParallel):
+                model = model.module
+
             torch.save({
                 'epoch': epoch + 1,
                 'arch': args.arch,
@@ -351,6 +356,8 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
         # compute output
         outputs = model(inputs)
+        if args.arch == "vit" :
+            outputs = outputs.logits
         if args.arch == "vit_custom" :
             # print(outputs)
             outputs = outputs[0]
@@ -421,7 +428,8 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
             if args.arch == "vit_custom" :
                 # outputs = outputs.logits
                 outputs = outputs[0]
-                
+            if args.arch == "vit" :
+                outputs = outputs.logits
             loss = criterion(outputs, targets)
 
             # measure accuracy and record loss

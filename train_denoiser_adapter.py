@@ -137,6 +137,7 @@ class ViTLayerWithFourierTransform(nn.Module):
         if self.do_invert:
             hidden_states = self.inverse_fourier_transform(hidden_states)
         return hidden_states
+
 class AdapterWithFourierTransform(nn.Module):
     def __init__(self, original_layer, do_invert=False):
         super(AdapterWithFourierTransform, self).__init__()
@@ -251,6 +252,8 @@ def main():
     subset_train_dataset = Subset(train_dataset, subset_indices)
 
     pin_memory = (args.dataset == "imagenet")
+    
+    print("creating train dataloader with dataset of size : ",len(subset_train_dataset))
     train_loader = DataLoader(subset_train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=args.workers, pin_memory=pin_memory)
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
@@ -273,7 +276,6 @@ def main():
 
 
     starting_epoch = 0
-
     logfilename = os.path.join(args.outdir+folder+"/"+str(args.noise_sd), 'log.txt')
 
     ## Resume from checkpoint if exists and if resume flag is True
@@ -282,8 +284,7 @@ def main():
 
     if os.path.isfile(model_path) and args.dataset not in ["cifar10", "imagenet"]:
         print("=> loading checkpoint '{}'".format(model_path))
-        checkpoint = torch.load(model_path,
-                                map_location=lambda storage, loc: storage)
+        checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
         # starting_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
 
@@ -316,14 +317,15 @@ def main():
     model.set_active_adapters("denoising-adapter")
     model.train_adapter("denoising-adapter")
 
+    if args.dataset not in ['cifar10', 'imagenet']:
+        model = torch.nn.Sequential(normalize_layer, model) 
+
     if args.do_fourier:
         if args.fourier_location == 'attention':
             model = add_fourier_transform_to_vit(model, gap=args.gap)
         else:
             model = add_fourier_transform_to_adapters(model, gap=1)
 
-    if args.dataset not in ["cifar10", "imagenet"]:
-        model = torch.nn.Sequential(normalize_layer, model)
 
     model.to('cuda')
     optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
