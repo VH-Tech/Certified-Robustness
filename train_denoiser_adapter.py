@@ -286,7 +286,16 @@ def main():
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
         # starting_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['state_dict'])
+        # Create a new state dict with modified keys
+        new_state_dict = {}
+        for k, v in checkpoint["state_dict"].items():
+            if k.startswith('1.module.'):
+                new_key = k.replace('1.module.', '1.')
+                new_state_dict[new_key] = v
+            else:
+                new_state_dict[k] = v
+
+        model.load_state_dict(new_state_dict)
 
         print("=> loaded checkpoint '{}' (epoch {})"
                         .format(model_path, checkpoint['epoch']))

@@ -135,7 +135,7 @@ def main():
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
     if args.tuning_method == 'full':
-        args.outdir = os.path.join(args.outdir, 'full_' + str(args.noise_sd))
+        args.outdir = os.path.join(args.outdir, args.dataset_fraction, 'full_' + str(args.noise_sd))
         os.makedirs(args.outdir, exist_ok=True)
 
     if args.resume and os.path.isfile(model_path):
@@ -328,7 +328,6 @@ def main():
 
         wandb.log({"train_loss": train_loss, "test_loss": test_loss, "train_acc": train_acc, "test_acc": test_acc, "best" : best, "lr" : scheduler.get_lr()[0]})
         
-
 
 def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
     """

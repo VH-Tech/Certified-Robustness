@@ -69,6 +69,7 @@ def pjoin(*args):
 
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
+
 VIT = False
 
 def main():
