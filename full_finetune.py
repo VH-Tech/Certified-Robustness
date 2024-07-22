@@ -103,6 +103,7 @@ def main():
     # Create a subset of the CIFAR10 dataset
     subset_indices = torch.randperm(len(train_dataset))[:subset_size]
     train_dataset = Subset(train_dataset, subset_indices)
+    print("train dataset length : ", len(train_dataset))
 
 
     pin_memory = (args.dataset == "imagenet")
