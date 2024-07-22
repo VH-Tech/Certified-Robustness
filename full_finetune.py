@@ -135,7 +135,7 @@ def main():
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
     if args.tuning_method == 'full':
-        args.outdir = os.path.join(args.outdir, args.dataset_fraction, 'full_' + str(args.noise_sd))
+        args.outdir = os.path.join(args.outdir, str(args.dataset_fraction), 'full_' + str(args.noise_sd))
         os.makedirs(args.outdir, exist_ok=True)
 
     if args.resume and os.path.isfile(model_path):
