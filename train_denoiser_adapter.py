@@ -393,7 +393,8 @@ def main():
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
-            normalize_layer, model = model
+            if args.dataset not in ['cifar10']:
+                normalize_layer, model = model
 
             # Save adapter
             model.save_adapter( args.outdir+folder+"/"+str(int(args.noise_sd*100)), "denoising-adapter-"+str(int(args.noise_sd*100)))
