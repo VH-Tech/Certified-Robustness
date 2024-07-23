@@ -223,8 +223,8 @@ def main():
             config = IA3Config()
 
     folder += "_"+str(args.dataset_fraction)
-    if not os.path.exists(args.outdir+folder+"/"+str(args.noise_sd)):
-        os.makedirs(args.outdir+folder+"/"+str(args.noise_sd), exist_ok=True)
+    if not os.path.exists(args.outdir+folder+"/"+str(int(args.noise_sd*100))):
+        os.makedirs(args.outdir+folder+"/"+str(int(args.noise_sd*100)), exist_ok=True)
 
     if args.do_norm == 0:
         args.do_norm = False
@@ -276,10 +276,10 @@ def main():
 
 
     starting_epoch = 0
-    logfilename = os.path.join(args.outdir+folder+"/"+str(args.noise_sd), 'log.txt')
+    logfilename = os.path.join(args.outdir+folder+"/"+str(int(args.noise_sd*100)), 'log.txt')
 
     ## Resume from checkpoint if exists and if resume flag is True
-    adapter_path = args.outdir+folder+"/"+str(args.noise_sd)
+    adapter_path = args.outdir+folder+"/"+str(int(args.noise_sd*100))
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
 
     if os.path.isfile(model_path) and args.dataset not in ["cifar10", "imagenet"]:
@@ -318,13 +318,13 @@ def main():
         best = checkpoint_adapter['test_acc']
 
     else:
-        model.add_adapter("denoising-adapter-"+str(args.noise_sd), config=config)
+        model.add_adapter("denoising-adapter-"+str(int(args.noise_sd*100)), config=config)
         init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
         best = 0.0 
 
     #set active adapter
-    model.set_active_adapters("denoising-adapter-"+str(args.noise_sd))
-    model.train_adapter("denoising-adapter-"+str(args.noise_sd))
+    model.set_active_adapters("denoising-adapter-"+str(int(args.noise_sd*100)))
+    model.train_adapter("denoising-adapter-"+str(int(args.noise_sd*100)))
 
     if args.dataset not in ['cifar10', 'imagenet']:
         model = torch.nn.Sequential(normalize_layer, model) 
@@ -349,7 +349,7 @@ def main():
         for param_group in optimizer.param_groups:
             param_group['lr'] = args.lr
 
-    project_name = args.arch+"_"+args.dataset+"_"+args.adapter_config+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd)
+    project_name = args.arch+"_"+args.dataset+"_"+args.adapter_config+"_"+str(args.dataset_fraction)+"_"+str(int(args.noise_sd*100))
     if args.do_fourier:
         project_name += "_fourier_"+args.fourier_location
         if args.invert_domain:
@@ -396,7 +396,7 @@ def main():
             normalize_layer, model = model
 
             # Save adapter
-            model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter-"+str(args.noise_sd))
+            model.save_adapter( args.outdir+folder+"/"+str(int(args.noise_sd*100)), "denoising-adapter-"+str(int(args.noise_sd*100)))
             model = torch.nn.Sequential(normalize_layer, model)
             # torch.save({
             #     'epoch': epoch + 1,
