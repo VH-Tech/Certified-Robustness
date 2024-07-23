@@ -81,6 +81,7 @@ if args.philly_imagenet_path:
 random.seed(0)
 # torch.manual_seed(0)
 # torch.cuda.manual_seed_all(0)
+global VIT
 VIT = False
 
 def main():
@@ -91,8 +92,16 @@ def main():
     # Copy code to output directory
     # copy_code(args.outdir)
 
-    train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
-    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
+    if "vit" in args.arch or "swin" in args.arch:
+        global VIT
+        VIT = True
+        train_dataset = get_dataset(args.dataset, 'train', args.data_dir, model_input=224)
+        test_dataset = get_dataset(args.dataset, 'test', args.data_dir, model_input=224)
+
+    else:
+        train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
+        test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
+
     pin_memory = (args.dataset == "imagenet")
 
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
@@ -100,9 +109,6 @@ def main():
 
     model = get_architecture(args.arch, args.dataset)
     normalize_layer, model = model
-    if "vit" in args.arch:
-        global VIT
-        VIT = True
 
     if args.focal:
 
@@ -146,11 +152,11 @@ def main():
         
         adapters.init(model)
         model.load_adapter(adapter_path)
-        model.set_active_adapters("denoising-adapter")
+        model.set_active_adapters("denoising-adapter-"+str(int(args.noise_sd*100)))
     # normalize_layer, model = model
-    model = torch.nn.Sequential(normalize_layer, model)
+    # model = torch.nn.Sequential(normalize_layer, model)
     model.to('cuda')
-    test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
+    test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd - 0.75)
     print(test_loss, test_acc)
 
 
