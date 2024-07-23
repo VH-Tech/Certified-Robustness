@@ -318,7 +318,7 @@ def main():
         best = checkpoint_adapter['test_acc']
 
     else:
-        model.add_adapter("denoising-adapter", config=config)
+        model.add_adapter("denoising-adapter-"+str(args.noise_sd), config=config)
         init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
         best = 0.0 
 
