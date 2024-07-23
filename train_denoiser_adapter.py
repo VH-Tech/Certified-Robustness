@@ -323,8 +323,8 @@ def main():
         best = 0.0 
 
     #set active adapter
-    model.set_active_adapters("denoising-adapter")
-    model.train_adapter("denoising-adapter")
+    model.set_active_adapters("denoising-adapter-"+str(args.noise_sd))
+    model.train_adapter("denoising-adapter-"+str(args.noise_sd))
 
     if args.dataset not in ['cifar10', 'imagenet']:
         model = torch.nn.Sequential(normalize_layer, model) 
@@ -393,21 +393,21 @@ def main():
         if test_acc > best:
             print(f'New Best Found: {test_acc}%')
             best = test_acc
-            # normalize_layer, model = model
+            normalize_layer, model = model
 
-            # # Save adapter
-            # model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter")
-            # model = torch.nn.Sequential(normalize_layer, model)
-            torch.save({
-                'epoch': epoch + 1,
-                'arch': args.arch,
-                'optimizer': optimizer.state_dict(),
-                'state_dict': model.state_dict(),
-                'train_acc' : train_acc,
-                'test_acc' : test_acc,
-                'train_loss' : train_loss,
-                'test_loss' : test_loss,
-            }, os.path.join(adapter_path, 'checkpoint.pth.tar'))
+            # Save adapter
+            model.save_adapter( args.outdir+folder+"/"+str(args.noise_sd), "denoising-adapter-"+str(args.noise_sd))
+            model = torch.nn.Sequential(normalize_layer, model)
+            # torch.save({
+            #     'epoch': epoch + 1,
+            #     'arch': args.arch,
+            #     'optimizer': optimizer.state_dict(),
+            #     'state_dict': model.state_dict(),
+            #     'train_acc' : train_acc,
+            #     'test_acc' : test_acc,
+            #     'train_loss' : train_loss,
+            #     'test_loss' : test_loss,
+            # }, os.path.join(adapter_path, 'checkpoint.pth.tar'))
 
         wandb.log({"train_loss": train_loss, "test_loss": test_loss, "train_acc": train_acc, "test_acc": test_acc, "best" : best, "lr" : scheduler.get_lr()[0]})
         
