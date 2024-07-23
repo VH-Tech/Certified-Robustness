@@ -369,7 +369,7 @@ def main():
     )
 
 
-    model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
+    # model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
     print("Training " +  str((count_parameters_trainable(model)/(count_parameters_total(model)))*100)  +"% of the parameters")
     print("starting training")
     for epoch in range(starting_epoch, args.epochs):
@@ -563,8 +563,8 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
-        # loss.backward()
-        accelerator.backward(loss)
+        loss.backward()
+        # accelerator.backward(loss)
         optimizer.step()
 
         # measure elapsed time
