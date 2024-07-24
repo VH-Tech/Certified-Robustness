@@ -31,6 +31,7 @@ import torchvision
 import random
 import wandb
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config, Fuse
+
 accelerator = Accelerator()
 
 def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
@@ -65,19 +66,27 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
         #     #choose randomly a value between 0 and 1
         #     noise_sd = random.random()
         if noise_sd < 0:
-            choices = np.array([0.25, 0.5, 0.75, 1.0])
-            noise_sd = np.random.choice(choices)
+            choices = [0.25, 0.5, 0.75, 1.0]
+            loss = 0
+            noise = torch.randn_like(inputs, device='cuda')
+            for noise_sd in choices:
+                inputs = inputs + noise * noise_sd
+                outputs = model(inputs).logits
+                loss += criterion(outputs, targets)
+            
+            loss = loss/4
+            
+        else:
+            inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
 
-        inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
-
-        # compute output
-        outputs = model(inputs)
-        if VIT == True :
-            outputs = outputs.logits
+            # compute output
+            outputs = model(inputs)
+            if VIT == True :
+                outputs = outputs.logits
         
         # print(outputs.shape, targets.shape)
         
-        loss = criterion(outputs, targets)
+            loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
         acc1 = accuracy(outputs, targets, topk=(1,))[0]
@@ -139,17 +148,25 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
             #     noise_sd = random.random()
 
             if noise_sd < 0:
-                choices = np.array([0.25, 0.5, 0.75, 1.0])
-                noise_sd = np.random.choice(choices)
+                choices = [0.25, 0.5, 0.75, 1.0]
+                loss = 0
+                noise = torch.randn_like(inputs, device='cuda')
+                for noise_sd in choices:
+                    inputs = inputs + noise * noise_sd
+                    outputs = model(inputs).logits
+                    loss += criterion(outputs, targets)
                 
-            inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
+                loss = loss/4
+            
+            else:
+                inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
 
-            # compute output
-            outputs = model(inputs)
-            if VIT == True :
-                outputs = outputs.logits
-                
-            loss = criterion(outputs, targets)
+                # compute output
+                outputs = model(inputs)
+                if VIT == True :
+                    outputs = outputs.logits
+                    
+                loss = criterion(outputs, targets)
 
             # measure accuracy and record loss
             acc1 = accuracy(outputs, targets, topk=(1,))[0]
@@ -189,9 +206,9 @@ subset_train_dataset = Subset(train_dataset, subset_indices)
 pin_memory = ("cifar10" == "imagenet")
     
 print("creating train dataloader with dataset of size : ",len(subset_train_dataset))
-train_loader = DataLoader(subset_train_dataset, shuffle=True, batch_size=32,
+train_loader = DataLoader(subset_train_dataset, shuffle=True, batch_size=8,
                               num_workers=8, pin_memory=pin_memory)
-test_loader = DataLoader(test_dataset, shuffle=False, batch_size=32,
+test_loader = DataLoader(test_dataset, shuffle=False, batch_size=8,
                              num_workers=8, pin_memory=pin_memory)
 
 model = get_architecture("vit", "cifar10")
@@ -214,17 +231,17 @@ VIT = True
 criterion = CrossEntropyLoss().cuda()
 
 starting_epoch = 0
-logfilename = os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/log.txt')
-os.makedirs('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1', exist_ok=True)
-
+logfilename = os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_discrete_0.1/log.txt')
+os.makedirs('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_discrete_0.1', exist_ok=True)
 optimizer = SGD(model.parameters(), lr=5e-4, momentum=0.9, weight_decay=5e-4)
 scheduler = StepLR(optimizer, step_size=60, gamma=0.1)
 model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
 model = model.cuda()
 
+
 wandb.init(
     # set the wandb project where this run will be logged
-    project="adapter_fusion_0.1",
+    project="adapter_fusion_discrete_0.1",
 
     # track hyperparameters and run metadata
     config={
@@ -241,9 +258,9 @@ for epoch in range(starting_epoch, 180):
     before = time.time()
 
 
-    train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, 1)
+    train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, -1)
 
-    test_loss, test_acc = test(test_loader, model, criterion, 1)
+    test_loss, test_acc = test(test_loader, model, criterion, -1)
     after = time.time()
 
     log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
@@ -255,16 +272,21 @@ for epoch in range(starting_epoch, 180):
     if test_acc > best:
         print(f'New Best Found: {test_acc}%')
         best = test_acc
-        # if "cifar10" not in ['cifar10']:
-        #     normalize_layer, model = model
+        if "cifar10" not in ['cifar10']:
+            normalize_layer, model = model
 
-        # # Save fusion
-        # # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-75,denoising-adapter-25,denoising-adapter-50,denoising-adapter-100")
-    
-        # # model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/', "denoising-adapter-"+str(int(args.noise_sd*100)))
+        # Save fusion
+        # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_discrete_0.1/", "denoising-adapter-75,denoising-adapter-25,denoising-adapter-50,denoising-adapter-100")
+        torch.save({
+                'epoch': epoch + 1,
+                'arch': "vit",
+                'state_dict': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+            }, os.path.join("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_discrete_0.1/", 'checkpoint.pth.tar'))
+        # model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_discrete_0.1/', "denoising-adapter-"+str(int(args.noise_sd*100)))
 
-        # if "cifar10" not in ['cifar10']:
-        #     model = torch.nn.Sequential(normalize_layer, model)
+        if "cifar10" not in ['cifar10']:
+            model = torch.nn.Sequential(normalize_layer, model)
 
 
     wandb.log({"train_loss": train_loss, "test_loss": test_loss, "train_acc": train_acc, "test_acc": test_acc, "best" : best, "lr" : scheduler.get_lr()[0]})
