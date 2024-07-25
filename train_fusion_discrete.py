@@ -70,8 +70,8 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
             loss = 0
             noise = torch.randn_like(inputs, device='cuda')
             for noise_sd in choices:
-                inputs = inputs + noise * noise_sd
-                outputs = model(inputs).logits
+                model_inputs = inputs + noise * noise_sd
+                outputs = model(model_inputs).logits
                 loss += criterion(outputs, targets)
             
             loss = loss/4
@@ -152,8 +152,8 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
                 loss = 0
                 noise = torch.randn_like(inputs, device='cuda')
                 for noise_sd in choices:
-                    inputs = inputs + noise * noise_sd
-                    outputs = model(inputs).logits
+                    model_inputs = inputs + noise * noise_sd
+                    outputs = model_inputs(inputs).logits
                     loss += criterion(outputs, targets)
                 
                 loss = loss/4

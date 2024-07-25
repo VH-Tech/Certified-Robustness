@@ -9,7 +9,7 @@ ulimit -s unlimited
 ulimit -c unlimited
 
 source activate /scratch/ravihm.scee.iitmandi/pytorch
-
 cd /home/ravihm.scee.iitmandi/Certified-Robustness
 
-CUDA_VISIBLE_DEVICES=0,1 accelerate launch train_fusion.py
+python adapter_parallel_stack.py --noise_sd 1 --name selector-adapter-0.1
+python adapter_parallel_stack.py --noise_sd 1 --name selector-adapter-seq_bn-0.1 --adapter_config seq_bn

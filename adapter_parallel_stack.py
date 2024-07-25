@@ -30,8 +30,18 @@ import torch
 import torchvision
 import random
 import wandb
+import adapters.composition as ac
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config, Fuse
 accelerator = Accelerator()
+
+parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
+parser.add_argument('--noise_sd', type=int, default=1)
+parser.add_argument('--lr', type=float, default=1e-1)
+parser.add_argument('--batch', type=int, default=128)
+parser.add_argument('--name', type=str, default="selector-adapter")
+parser.add_argument('--adapter_config', type=str, default="compacter")
+args = parser.parse_args()
+
 
 def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
     """
@@ -186,9 +196,9 @@ subset_train_dataset = Subset(train_dataset, subset_indices)
 pin_memory = ("cifar10" == "imagenet")
     
 print("creating train dataloader with dataset of size : ",len(subset_train_dataset))
-train_loader = DataLoader(subset_train_dataset, shuffle=True, batch_size=32,
+train_loader = DataLoader(subset_train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=8, pin_memory=pin_memory)
-test_loader = DataLoader(test_dataset, shuffle=False, batch_size=32,
+test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
                              num_workers=8, pin_memory=pin_memory)
 
 model = get_architecture("vit", "cifar10")
@@ -198,30 +208,26 @@ model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_co
 model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.5", with_head=False)
 model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.75", with_head=False)
 model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/1.0", with_head=False)
-
-# Add a fusion layer for all loaded adapters
-adapter_setup = Fuse('denoising-adapter-75', 'denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-100')
-model.add_adapter_fusion(adapter_setup)
-
-# Unfreeze and activate fusion setup
-model.train_adapter_fusion(adapter_setup)
+model.add_adapter("selection-adapter", config=args.adapter_config)
+model.active_adapters = ac.Stack(ac.Parallel('denoising-adapter-75', 'denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-100'), "selection-adapter")
+model.train_adapter("selection-adapter")
 
 global VIT
 VIT = True
 criterion = CrossEntropyLoss().cuda()
 
 starting_epoch = 0
-logfilename = os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/log.txt')
-os.makedirs('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1', exist_ok=True)
+logfilename = os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_0.1/log.txt')
+os.makedirs('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_0.1', exist_ok=True)
 
-optimizer = SGD(model.parameters(), lr=5e-4, momentum=0.9, weight_decay=5e-4)
+optimizer = SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 scheduler = StepLR(optimizer, step_size=60, gamma=0.1)
 model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
 model = model.cuda()
 
 wandb.init(
     # set the wandb project where this run will be logged
-    project="adapter_fusion_0.1",
+    project=args.name,
 
     # track hyperparameters and run metadata
     config={
@@ -231,16 +237,16 @@ wandb.init(
     "epochs": 90,
     }
 )
-# print("Training " +  str((count_parameters_trainable(model)/(count_parameters_total(model)))*100)  +"% of the parameters")
+print("Training " +  str((count_parameters_trainable(model)/(count_parameters_total(model)))*100)  +"% of the parameters")
 print("starting training")
 best = 0
 for epoch in range(starting_epoch, 180):
     before = time.time()
 
 
-    train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, 1)
+    train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
 
-    test_loss, test_acc = test(test_loader, model, criterion, 1)
+    test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
     after = time.time()
 
     log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
@@ -249,7 +255,7 @@ for epoch in range(starting_epoch, 180):
 
     scheduler.step(epoch)
 
-    if test_acc > best:
+    if test_acc > best and ((epoch > 0 and args.noise_sd > 0) or (epoch > 0 and args.noise_sd < 0)):
         print(f'New Best Found: {test_acc}%')
         best = test_acc
         # if "cifar10" not in ['cifar10']:
@@ -258,7 +264,7 @@ for epoch in range(starting_epoch, 180):
         # # Save fusion
         # # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-75,denoising-adapter-25,denoising-adapter-50,denoising-adapter-100")
     
-        # # model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/', "denoising-adapter-"+str(int(args.noise_sd*100)))
+        model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_compacter_0.1/', "selection-adapter")
 
         # if "cifar10" not in ['cifar10']:
         #     model = torch.nn.Sequential(normalize_layer, model)
