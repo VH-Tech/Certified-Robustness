@@ -32,6 +32,8 @@ import random
 import wandb
 from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config, Fuse
 accelerator = Accelerator()
+torch.manual_seed(0)
+torch.cuda.manual_seed_all(0)
 
 def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
     """
@@ -200,7 +202,7 @@ model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_co
 model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/1.0", with_head=False)
 
 # Add a fusion layer for all loaded adapters
-adapter_setup = Fuse('denoising-adapter-75', 'denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-100')
+adapter_setup = Fuse('denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-75', 'denoising-adapter-100')
 model.add_adapter_fusion(adapter_setup)
 
 # Unfreeze and activate fusion setup
@@ -238,9 +240,9 @@ for epoch in range(starting_epoch, 180):
     before = time.time()
 
 
-    train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, 1)
+    train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, -1)
 
-    test_loss, test_acc = test(test_loader, model, criterion, 1)
+    test_loss, test_acc = test(test_loader, model, criterion, -1)
     after = time.time()
 
     log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
@@ -256,10 +258,20 @@ for epoch in range(starting_epoch, 180):
         #     normalize_layer, model = model
 
         # # Save fusion
-        # # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-75,denoising-adapter-25,denoising-adapter-50,denoising-adapter-100")
-    
+        # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")
+        # model.save_head("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")
         # # model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/', "denoising-adapter-"+str(int(args.noise_sd*100)))
 
+        torch.save({
+                'epoch': epoch + 1,
+                'arch': "vit",
+                'optimizer': optimizer.state_dict(),
+                'state_dict': model.state_dict(),
+                'train_acc' : train_acc,
+                'test_acc' : test_acc,
+                'train_loss' : train_loss,
+                'test_loss' : test_loss,
+            }, os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/', 'checkpoint.pth.tar'))
         # if "cifar10" not in ['cifar10']:
         #     model = torch.nn.Sequential(normalize_layer, model)
 

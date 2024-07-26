@@ -19,7 +19,7 @@ import os
 import time
 import torch
 import random
-from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config
+from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config, Fuse
 import adapters
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -145,12 +145,26 @@ def main():
     if args.focal :
         folder += "_focal"
     if args.adapter_config == "fusion":
+        adapters.init(model)
         model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.25", with_head=False)
         model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.5", with_head=False)
         model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.75", with_head=False)
         model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/1.0", with_head=False)
 
-        model.load_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-75,denoising-adapter-25,denoising-adapter-50,denoising-adapter-100")
+        # Add a fusion layer for all loaded adapters
+        adapter_setup = Fuse('denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-75', 'denoising-adapter-100')
+        model.add_adapter_fusion(adapter_setup)
+
+        # Unfreeze and activate fusion setup
+        model.train_adapter_fusion(adapter_setup)
+
+        checkpoint = torch.load(os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/', 'checkpoint.pth.tar'), map_location=lambda storage, loc: storage)
+        model.load_state_dict(checkpoint['state_dict'])
+        # model.set_active_adapters(['denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-75', 'denoising-adapter-100'])
+        # model.load_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")
+
+        # model.load_head("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/")
+        print("loaded everything")
     elif args.adapter_config:
         folder += "_"+args.adapter_config
         folder += "_"+str(args.dataset_fraction)
@@ -162,7 +176,7 @@ def main():
     # normalize_layer, model = model
     # model = torch.nn.Sequential(normalize_layer, model)
     model.to('cuda')
-    test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd - 0.75)
+    test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
     print(test_loss, test_acc)
 
 
