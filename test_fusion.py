@@ -79,8 +79,8 @@ if args.philly_imagenet_path:
     os.environ['IMAGENET_DIR_PHILLY'] = os.path.join(args.philly_imagenet_path, './')
 
 random.seed(0)
-# torch.manual_seed(0)
-# torch.cuda.manual_seed_all(0)
+torch.manual_seed(0)
+torch.cuda.manual_seed_all(0)
 global VIT
 VIT = False
 
@@ -146,10 +146,10 @@ def main():
         folder += "_focal"
     if args.adapter_config == "fusion":
         adapters.init(model)
-        model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.25", with_head=False)
-        model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.5", with_head=False)
-        model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.75", with_head=False)
-        model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/1.0", with_head=False)
+        model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.25", with_head=False)
+        model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.5", with_head=False)
+        model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.75", with_head=False)
+        model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/1.0", with_head=False)
 
         # Add a fusion layer for all loaded adapters
         adapter_setup = Fuse('denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-75', 'denoising-adapter-100')
@@ -158,7 +158,7 @@ def main():
         # Unfreeze and activate fusion setup
         model.train_adapter_fusion(adapter_setup)
 
-        checkpoint = torch.load(os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/', 'checkpoint.pth.tar'), map_location=lambda storage, loc: storage)
+        checkpoint = torch.load(os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_range_0.1/', 'checkpoint.pth.tar'), map_location=lambda storage, loc: storage)
         model.load_state_dict(checkpoint['state_dict'])
         # model.set_active_adapters(['denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-75', 'denoising-adapter-100'])
         # model.load_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")

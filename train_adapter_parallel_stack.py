@@ -217,8 +217,8 @@ VIT = True
 criterion = CrossEntropyLoss().cuda()
 
 starting_epoch = 0
-logfilename = os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_0.1/log.txt')
-os.makedirs('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_0.1', exist_ok=True)
+logfilename = os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_'+args.adapter_config+'_0.1/log.txt')
+os.makedirs('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_'+args.adapter_config+'_0.1', exist_ok=True)
 
 optimizer = SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 scheduler = StepLR(optimizer, step_size=60, gamma=0.1)
@@ -264,7 +264,7 @@ for epoch in range(starting_epoch, 180):
         # # Save fusion
         # # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-75,denoising-adapter-25,denoising-adapter-50,denoising-adapter-100")
     
-        model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_compacter_0.1/', "selection-adapter")
+        model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_'+str(args.adapter_config)+'_0.1/', "selection-adapter")
 
         # if "cifar10" not in ['cifar10']:
         #     model = torch.nn.Sequential(normalize_layer, model)

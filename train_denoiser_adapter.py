@@ -389,11 +389,10 @@ def main():
 
         elif args.train_range:
             train_loss, train_acc = train_range(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
-
+            test_loss, test_acc = test_range(test_loader, model, criterion, args.noise_sd)
         else:
             train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.noise_sd)
-
-        test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
+            test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
         after = time.time()
 
         log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
@@ -626,7 +625,7 @@ def train_range(loader: DataLoader, model: torch.nn.Module, criterion, optimizer
             noise_sd = random.random()
 
         min = noise_sd - 0.25
-        inputs = inputs + (torch.randn_like(inputs, device='cuda') * 0.25) + min #min_new + (max_new - min_new) * value
+        inputs = inputs + (torch.randn_like(inputs, device='cuda') * 0.25) + min 
 
         # compute output
         outputs = model(inputs)
@@ -663,6 +662,70 @@ def train_range(loader: DataLoader, model: torch.nn.Module, criterion, optimizer
                 data_time=data_time, loss=losses, top1=top1))
 
     return (losses.avg, top1.avg)
+
+
+def test_range(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float):
+    """
+    Function to evaluate the trained model
+        :param loader:DataLoader: dataloader (train)
+        :param model:torch.nn.Module: the classifer being evaluated
+        :param criterion: the loss function
+        :param noise_sd:float: the std-dev of the Guassian noise perturbation of the input
+    """
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    # top5 = AverageMeter()
+    end = time.time()
+
+    # switch to eval mode
+    model.eval()
+
+    with torch.no_grad():
+        for i, (inputs, targets) in enumerate(loader):
+            # measure data loading time
+            data_time.update(time.time() - end)
+
+            inputs = inputs.cuda()
+            targets = targets.cuda()
+
+            # augment inputs with noise
+            if noise_sd == -1:
+                #choose randomly a value between 0 and 1
+                noise_sd = random.random()
+                
+            min = noise_sd - 0.25
+            inputs = inputs + (torch.randn_like(inputs, device='cuda') * 0.25) + min 
+
+            # compute output
+            outputs = model(inputs)
+            if VIT == True :
+                outputs = outputs.logits
+                
+            loss = criterion(outputs, targets)
+
+            # measure accuracy and record loss
+            acc1 = accuracy(outputs, targets, topk=(1,))[0]
+            losses.update(loss.item(), inputs.size(0))
+            top1.update(acc1.item(), inputs.size(0))
+            # top5.update(acc5.item(), inputs.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                print('Test: [{0}/{1}]\t'
+                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Acc@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                    i, len(loader), batch_time=batch_time,
+                    data_time=data_time, loss=losses, top1=top1))
+
+        return (losses.avg, top1.avg)
+
 
 def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float):
     """

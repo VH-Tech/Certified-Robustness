@@ -11,5 +11,5 @@ ulimit -c unlimited
 source activate /scratch/ravihm.scee.iitmandi/pytorch
 cd /home/ravihm.scee.iitmandi/Certified-Robustness
 
-python adapter_parallel_stack.py --noise_sd -1 --name selector-adapter-mixbag-0.1
-python adapter_parallel_stack.py --noise_sd -1 --name selector-adapter-seq_bn-mixbag-0.1 --adapter_config seq_bn
+python train_adapter_parallel_stack.py --noise_sd -1 --name selector-adapter-mixbag-0.1
+python train_adapter_parallel_stack.py --noise_sd -1 --name selector-adapter-seq_bn-mixbag-0.1 --adapter_config seq_bn

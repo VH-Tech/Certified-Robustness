@@ -196,10 +196,10 @@ test_loader = DataLoader(test_dataset, shuffle=False, batch_size=32,
 model = get_architecture("vit", "cifar10")
 _, model = model
 adapters.init(model)
-model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.25", with_head=False)
-model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.5", with_head=False)
-model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/0.75", with_head=False)
-model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_0.1/1.0", with_head=False)
+model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.25", with_head=False)
+model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.5", with_head=False)
+model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.75", with_head=False)
+model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/1.0", with_head=False)
 
 # Add a fusion layer for all loaded adapters
 adapter_setup = Fuse('denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-75', 'denoising-adapter-100')
@@ -213,8 +213,8 @@ VIT = True
 criterion = CrossEntropyLoss().cuda()
 
 starting_epoch = 0
-logfilename = os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/log.txt')
-os.makedirs('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1', exist_ok=True)
+logfilename = os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_range_0.1/log.txt')
+os.makedirs('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_range_0.1', exist_ok=True)
 
 optimizer = SGD(model.parameters(), lr=5e-4, momentum=0.9, weight_decay=5e-4)
 scheduler = StepLR(optimizer, step_size=60, gamma=0.1)
@@ -258,9 +258,9 @@ for epoch in range(starting_epoch, 180):
         #     normalize_layer, model = model
 
         # # Save fusion
-        # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")
-        # model.save_head("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")
-        # # model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/', "denoising-adapter-"+str(int(args.noise_sd*100)))
+        # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_range_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")
+        # model.save_head("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_range_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")
+        # # model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_range_0.1/', "denoising-adapter-"+str(int(args.noise_sd*100)))
 
         torch.save({
                 'epoch': epoch + 1,
@@ -271,7 +271,7 @@ for epoch in range(starting_epoch, 180):
                 'test_acc' : test_acc,
                 'train_loss' : train_loss,
                 'test_loss' : test_loss,
-            }, os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/', 'checkpoint.pth.tar'))
+            }, os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_range_0.1/', 'checkpoint.pth.tar'))
         # if "cifar10" not in ['cifar10']:
         #     model = torch.nn.Sequential(normalize_layer, model)
 
