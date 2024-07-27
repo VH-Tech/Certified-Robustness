@@ -553,7 +553,7 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
             #choose randomly a value between 0 and 1
             noise_sd = random.random()
 
-        inputs = inputs + (torch.randn_like(inputs, device='cuda') * noise_sd) #min_new + (max_new - min_new) * value
+        inputs = inputs + (torch.randn_like(inputs, device='cuda') * noise_sd) 
 
         # compute output
         outputs = model(inputs)
@@ -591,6 +591,31 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
     return (losses.avg, top1.avg)
 
+def transform_noise(noise, a=0.5, b=0.75):
+    """
+    Transform the values in the noise matrix from (-1, 1) to (-b, -a) U (a, b).
+
+    Parameters:
+    - noise: A NumPy array with values in the range (-1, 1).
+    - a: The lower bound of the positive target range.
+    - b: The upper bound of the positive target range.
+
+    Returns:
+    - transformed_noise: A NumPy array with transformed values.
+    """
+     # Create a copy to avoid modifying the original tensor
+    result = noise.clone()
+    
+    # Transform negative values
+    negative_mask = noise < 0
+    result[negative_mask] = -b + (noise[negative_mask] + 1) * (b - a)
+    
+    # Transform positive values
+    positive_mask = noise > 0
+    result[positive_mask] = a + noise[positive_mask] * (b - a)
+    
+    # Values exactly equal to 0 remain unchanged
+    return result
 
 def train_range(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
     """
@@ -620,12 +645,10 @@ def train_range(loader: DataLoader, model: torch.nn.Module, criterion, optimizer
         targets = targets.cuda()
 
         # augment inputs with noise
-        if noise_sd == -1:
-            #choose randomly a value between 0 and 1
-            noise_sd = random.random()
-
+        max = noise_sd
         min = noise_sd - 0.25
-        inputs = inputs + (torch.randn_like(inputs, device='cuda') * 0.25) + min 
+        noise = transform_noise(torch.randn_like(inputs, device='cuda'), min, max)
+        inputs = inputs + noise
 
         # compute output
         outputs = model(inputs)
@@ -663,7 +686,6 @@ def train_range(loader: DataLoader, model: torch.nn.Module, criterion, optimizer
 
     return (losses.avg, top1.avg)
 
-
 def test_range(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float):
     """
     Function to evaluate the trained model
@@ -691,12 +713,11 @@ def test_range(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: 
             targets = targets.cuda()
 
             # augment inputs with noise
-            if noise_sd == -1:
-                #choose randomly a value between 0 and 1
-                noise_sd = random.random()
-                
+            max = noise_sd
             min = noise_sd - 0.25
-            inputs = inputs + (torch.randn_like(inputs, device='cuda') * 0.25) + min 
+            noise = transform_noise(torch.randn_like(inputs, device='cuda'), min, max)
+            inputs = inputs + noise
+
 
             # compute output
             outputs = model(inputs)
@@ -725,7 +746,6 @@ def test_range(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: 
                     data_time=data_time, loss=losses, top1=top1))
 
         return (losses.avg, top1.avg)
-
 
 def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float):
     """

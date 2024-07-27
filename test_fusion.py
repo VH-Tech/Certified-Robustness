@@ -145,6 +145,7 @@ def main():
     if args.focal :
         folder += "_focal"
     if args.adapter_config == "fusion":
+        print("model created")
         adapters.init(model)
         model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.25", with_head=False)
         model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.5", with_head=False)
@@ -157,14 +158,21 @@ def main():
 
         # Unfreeze and activate fusion setup
         model.train_adapter_fusion(adapter_setup)
-
+        
         checkpoint = torch.load(os.path.join('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_range_0.1/', 'checkpoint.pth.tar'), map_location=lambda storage, loc: storage)
-        model.load_state_dict(checkpoint['state_dict'])
-        # model.set_active_adapters(['denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-75', 'denoising-adapter-100'])
-        # model.load_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-25,denoising-adapter-50,denoising-adapter-75,denoising-adapter-100")
 
-        # model.load_head("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/")
+        # Create a new state dict with modified keys
+        new_state_dict = {}
+        for k, v in checkpoint["state_dict"].items():
+            if k.startswith('module.'):
+                new_key = k.replace('module.', '')
+                new_state_dict[new_key] = v
+            else:
+                new_state_dict[k] = v
+        
+        model.load_state_dict(new_state_dict)
         print("loaded everything")
+
     elif args.adapter_config:
         folder += "_"+args.adapter_config
         folder += "_"+str(args.dataset_fraction)

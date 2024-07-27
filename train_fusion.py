@@ -30,6 +30,32 @@ parser.add_argument('--do_range', type=int, default=0)
 args = parser.parse_args()
 
 
+def transform_noise(noise, a=0.5, b=0.75):
+    """
+    Transform the values in the noise matrix from (-1, 1) to (-b, -a) U (a, b).
+
+    Parameters:
+    - noise: A NumPy array with values in the range (-1, 1).
+    - a: The lower bound of the positive target range.
+    - b: The upper bound of the positive target range.
+
+    Returns:
+    - transformed_noise: A NumPy array with transformed values.
+    """
+     # Create a copy to avoid modifying the original tensor
+    result = noise.clone()
+    
+    # Transform negative values
+    negative_mask = noise < 0
+    result[negative_mask] = -b + (noise[negative_mask] + 1) * (b - a)
+    
+    # Transform positive values
+    positive_mask = noise > 0
+    result[positive_mask] = a + noise[positive_mask] * (b - a)
+    
+    # Values exactly equal to 0 remain unchanged
+    return result
+
 def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
     """
     Function to do one training epoch
@@ -103,7 +129,6 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
     return (losses.avg, top1.avg)
 
-
 def train_range(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float):
     """
     Function to do one training epoch
@@ -174,7 +199,6 @@ def train_range(loader: DataLoader, model: torch.nn.Module, criterion, optimizer
 
     return (losses.avg, top1.avg)
 
-
 def test_range(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float):
     """
     Function to evaluate the trained model
@@ -237,7 +261,6 @@ def test_range(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: 
                     data_time=data_time, loss=losses, top1=top1))
 
         return (losses.avg, top1.avg)
-
 
 def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float):
     """
@@ -383,7 +406,7 @@ else:
     }
 )
 
-optimizer = SGD(model.parameters(), lr=5e-4, momentum=0.9, weight_decay=5e-4)
+optimizer = SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 scheduler = StepLR(optimizer, step_size=60, gamma=0.1)
 model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
 model = model.cuda()
