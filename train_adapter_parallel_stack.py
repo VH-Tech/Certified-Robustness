@@ -76,9 +76,9 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
         #     noise_sd = random.random()
         if noise_sd < 0:
             choices = np.array([0.25, 0.5, 0.75, 1.0])
-            noise_sd = np.random.choice(choices)
+            noise_sdd = np.random.choice(choices)
 
-        inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
+        inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sdd
 
         # compute output
         outputs = model(inputs)
@@ -150,9 +150,9 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
 
             if noise_sd < 0:
                 choices = np.array([0.25, 0.5, 0.75, 1.0])
-                noise_sd = np.random.choice(choices)
+                noise_sdd = np.random.choice(choices)
                 
-            inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
+            inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sdd
 
             # compute output
             outputs = model(inputs)
@@ -264,7 +264,17 @@ for epoch in range(starting_epoch, 180):
         # # Save fusion
         # # model.save_adapter_fusion("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_fusion_0.1/", "denoising-adapter-75,denoising-adapter-25,denoising-adapter-50,denoising-adapter-100")
     
-        model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_'+str(args.adapter_config)+'_0.1/', "selection-adapter")
+        # model.save_adapter('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_'+str(args.adapter_config)+'_0.1/', "selection-adapter")
+        torch.save({
+                    'epoch': epoch + 1,
+                    'arch': "vit",
+                    'optimizer': optimizer.state_dict(),
+                    'state_dict': model.state_dict(),
+                    'train_acc' : train_acc,
+                    'test_acc' : test_acc,
+                    'train_loss' : train_loss,
+                    'test_loss' : test_loss,
+                },'/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_'+str(args.adapter_config)+'_0.1/checkpoint.pth.tar')
 
         # if "cifar10" not in ['cifar10']:
         #     model = torch.nn.Sequential(normalize_layer, model)

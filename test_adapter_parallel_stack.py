@@ -22,16 +22,14 @@ from torch.utils.data import Dataset
 import json
 import adapters
 import argparse
-import datetime
+
 import numpy as np
-import os
+
 import time
 import torch
-import torchvision
+
 import random
-import wandb
 import adapters.composition as ac
-from adapters import ParBnConfig, SeqBnConfig, SeqBnInvConfig, PrefixTuningConfig, CompacterConfig, LoRAConfig, IA3Config, Fuse
 
 random.seed(0)
 torch.manual_seed(0)
@@ -116,7 +114,7 @@ test_dataset = get_dataset("cifar10", 'test', "/scratch/ravihm.scee.iitmandi/dat
 
 pin_memory = ("cifar10" == "imagenet")
 
-test_loader = DataLoader(test_dataset, shuffle=False, batch_size=128,
+test_loader = DataLoader(test_dataset, shuffle=False, batch_size=256,
                              num_workers=8, pin_memory=pin_memory)
 
 model = get_architecture("vit", "cifar10")
@@ -126,10 +124,22 @@ model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_co
 model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.5", with_head=False)
 model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/0.75", with_head=False)
 model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/adapters_compacter_range_0.1/1.0", with_head=False)
-model.load_adapter("/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_seq_bn_0.1/")
+model.add_adapter("selection-adapter", config=args.adapter_config)
 model.active_adapters = ac.Stack(ac.Parallel('denoising-adapter-75', 'denoising-adapter-25', 'denoising-adapter-50', 'denoising-adapter-100'), "selection-adapter")
 model.train_adapter("selection-adapter")
-# model.set_active_adapters('denoising-adapter-100')
+
+
+checkpoint = torch.load('/scratch/ravihm.scee.iitmandi/models/cifar10/vit/selection_adapter_compacter_0.1/checkpoint.pth.tar', map_location=lambda storage, loc: storage)
+new_state_dict = {}
+for k, v in checkpoint["state_dict"].items():
+    if k.startswith('module.'):
+        new_key = k.replace('module.', '')
+        new_state_dict[new_key] = v
+    else:
+        new_state_dict[k] = v
+
+model.load_state_dict(new_state_dict)
+print("loaded everything")
 
 global VIT
 VIT = True
