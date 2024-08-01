@@ -21,6 +21,7 @@ import os
 import time
 import torch
 import torchvision
+from torch.utils.data import Subset
 
 accelerator = Accelerator()
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -30,9 +31,11 @@ parser.add_argument('--outdir', type=str, help='folder to save denoiser and trai
 parser.add_argument('--data_dir', type=str, help='folder to load training data from')
 parser.add_argument('--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
+parser.add_argument('--dataset_fraction', default=1.0, type=float, metavar='N',
+                    help='dataset fraction')
 parser.add_argument('--epochs', default=40, type=int, metavar='N',
                     help='number of total epochs to run')
-parser.add_argument('--batch', default=16, type=int, metavar='N',
+parser.add_argument('--batch', default=30, type=int, metavar='N',
                     help='batchsize (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float,
                     help='initial learning rate', dest='lr')
@@ -100,7 +103,7 @@ def main():
     #     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     
     if not os.path.exists(args.outdir):
-        os.makedirs(args.outdir)
+        os.makedirs(args.outdir, exist_ok=True)
 
     if "vit" in args.arch:
         global VIT
@@ -109,16 +112,20 @@ def main():
     # Copy code to output directory
     # copy_code(args.outdir)
     
-    train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
-    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
+    train_dataset = get_dataset(args.dataset, 'train', args.data_dir, model_input = 224)
+    test_dataset = get_dataset(args.dataset, 'test', args.data_dir,  model_input = 224)
+
+    subset_size = int(len(train_dataset) * args.dataset_fraction)
+
+    # Create a subset of the CIFAR10 dataset
+    subset_indices = torch.randperm(len(train_dataset))[:subset_size]
+    train_dataset = Subset(train_dataset, subset_indices)
+    print("train dataset length : ", len(train_dataset))
+
     pin_memory = (args.dataset == "imagenet")
     train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch,
                               num_workers=args.workers, pin_memory=pin_memory)
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch,
-                             num_workers=args.workers, pin_memory=pin_memory)
-    ## This is used to test the performance of the denoiser attached to a cifar10 classifier
-    if args.dataset == 'cifar10':
-        cifar10_test_loader = DataLoader(get_dataset('cifar10', 'test', args.data_dir), shuffle=False, batch_size=args.batch,
                              num_workers=args.workers, pin_memory=pin_memory)
 
     if args.pretrained_denoiser:
@@ -176,7 +183,6 @@ def main():
         assert args.classifier != '', "Please specify a path to the classifier you want to attach the denoiser to."
         if args.classifier == 'resnet50':
             clf = get_architecture(args.classifier, args.dataset, pytorch_pretrained=True)
-            print("loaded resnet50")
 
         elif args.classifier in IMAGENET_CLASSIFIERS and args.dataset == 'imagenet':
             # assert args.dataset == 'imagenet'
@@ -191,6 +197,9 @@ def main():
             clf = get_architecture(checkpoint['arch'], args.dataset)
             _,clf=clf
             clf.load_state_dict(checkpoint['state_dict'])
+
+        norm_layer , clf = clf
+        print("removed norm layer")
         clf.cuda().eval()
         requires_grad_(clf, False)
 
@@ -233,10 +242,8 @@ def main():
                 train_loss = train_mixup(train_loader, denoiser, criterion, optimizer, epoch, args.noise_sd, clf, mode=args.mixup_mode, mixup_lam=args.mixup_lam)
             else:
                 train_loss = train(train_loader, denoiser, criterion, optimizer, epoch, args.noise_sd, clf)
-            if args.dataset == 'cifar10': 
-                test_loss, test_acc = test_with_classifier(cifar10_test_loader, denoiser, criterion, args.noise_sd, args.print_freq, clf)
-            else:
-                test_loss, test_acc = test_with_classifier(test_loader, denoiser, criterion, args.noise_sd, args.print_freq, clf)
+            
+            test_loss, test_acc = test_with_classifier(test_loader, denoiser, criterion, args.noise_sd, args.print_freq, clf)
 
         after = time.time()
         wandb.log({"train_loss": train_loss, "test_loss": test_loss, "test_acc": test_acc})
@@ -265,15 +272,7 @@ def main():
             best_loss = test_loss
         elif args.objective in ['classification', 'stability', 'focal', 'ldam'] and test_acc > best_acc:
             best_acc = test_acc
-        else:
-            continue
 
-        torch.save({
-            'epoch': epoch + 1,
-            'arch': args.arch,
-            'state_dict': denoiser.state_dict(),
-            'optimizer': optimizer.state_dict(),
-        }, os.path.join(args.outdir, 'best.pth.tar'))
 
 
 def train(loader: DataLoader, denoiser: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float, classifier: torch.nn.Module=None):
@@ -313,7 +312,7 @@ def train(loader: DataLoader, denoiser: torch.nn.Module, criterion, optimizer: O
         if classifier:
             outputs = classifier(outputs)
             # if VIT == True :
-            # outputs = outputs.logits
+            outputs = outputs.logits
         
         if isinstance(criterion, MSELoss):
             loss = criterion(outputs, inputs)
