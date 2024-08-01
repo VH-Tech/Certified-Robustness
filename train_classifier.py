@@ -296,7 +296,7 @@ def main():
     )
     model, optimizer, train_loader, scheduler = accelerator.prepare(model, optimizer, train_loader, scheduler)
     # join normalization layer to model
-    model = torch.nn.Sequential(normalize_layer, model)
+    # model = torch.nn.Sequential(normalize_layer, model)
     model = model.cuda()
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()

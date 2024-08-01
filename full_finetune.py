@@ -31,13 +31,13 @@ parser.add_argument('--outdir', type=str,
                     help='folder to save model and training log)')
 parser.add_argument('--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=90, type=int, metavar='N',
+parser.add_argument('--epochs', default=60, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--batch', default=64, type=int, metavar='N',
                     help='batchsize (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     help='initial learning rate', dest='lr')
-parser.add_argument('--lr_step_size', type=int, default=30,
+parser.add_argument('--lr_step_size', type=int, default=40,
                     help='How often to decrease learning by gamma.')
 parser.add_argument('--gamma', type=float, default=0.1,
                     help='LR is multiplied by gamma on schedule.')
@@ -131,7 +131,7 @@ def main():
 
     optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
-    scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr/1000)
+    # scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr/1000)
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
