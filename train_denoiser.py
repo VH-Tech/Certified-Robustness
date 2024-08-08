@@ -22,6 +22,7 @@ import time
 import torch
 import torchvision
 from torch.utils.data import Subset
+import torchvision.transforms as transforms
 
 accelerator = Accelerator()
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -88,32 +89,18 @@ parser.add_argument('--both', type=int, default=0,
                     help='do both')
 args = parser.parse_args()
 
-if args.azure_datastore_path:
-    os.environ['IMAGENET_DIR_AZURE'] = os.path.join(args.azure_datastore_path, 'datasets/imagenet_zipped')
-if args.philly_imagenet_path:
-    os.environ['IMAGENET_DIR_PHILLY'] = os.path.join(args.philly_imagenet_path, './')
-
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
 
 toPilImage = ToPILImage()
 
 def main():
-    # if args.gpu:
-    #     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    
+
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir, exist_ok=True)
 
-    if "vit" in args.arch:
-        global VIT
-        VIT = True
-
-    # Copy code to output directory
-    # copy_code(args.outdir)
-    
-    train_dataset = get_dataset(args.dataset, 'train', args.data_dir, model_input = 224)
-    test_dataset = get_dataset(args.dataset, 'test', args.data_dir,  model_input = 224)
+    train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
+    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
 
     subset_size = int(len(train_dataset) * args.dataset_fraction)
 
@@ -185,12 +172,12 @@ def main():
             clf = get_architecture(args.classifier, args.dataset, pytorch_pretrained=True)
 
         elif args.classifier in IMAGENET_CLASSIFIERS and args.dataset == 'imagenet':
-            # assert args.dataset == 'imagenet'
-            # loading pretrained imagenet architectures
             clf = get_architecture(args.classifier, args.dataset, pytorch_pretrained=True)
 
         elif args.classifier in CIFAR10_CLASSIFIERS and args.dataset == 'cifar10':
             clf = get_architecture(args.classifier, args.dataset, pytorch_pretrained=True)
+            norm_layer , clf = clf
+            print("removed norm layer and loaded cifar10 ViT")
 
         else:
             checkpoint = torch.load(args.classifier)
@@ -198,10 +185,10 @@ def main():
             _,clf=clf
             clf.load_state_dict(checkpoint['state_dict'])
 
-        norm_layer , clf = clf
-        print("removed norm layer")
+
         clf.cuda().eval()
         requires_grad_(clf, False)
+        print("frozen clf")
 
         if args.objective == 'focal':
             class_frequency = torch.unique(torch.tensor(train_dataset.targets), return_counts=True)[1] if args.dataset == 'pneumonia' else train_dataset.get_frequency()
@@ -221,15 +208,13 @@ def main():
     wandb.login()
     run = wandb.init(
     # Set the project where this run will be logged
-    project="denoiser_"+args.dataset+"_"+str(args.noise_sd),
+    project="denoiser_"+args.dataset+'_'+str(args.dataset_fraction)+"_"+str(args.noise_sd),
     # Track hyperparameters and run metadata
     config={
         "learning_rate": args.lr,
         "epochs": args.epochs,
     },
     )
-
-
 
     for epoch in range(starting_epoch, args.epochs):
         before = time.time()
@@ -273,8 +258,6 @@ def main():
         elif args.objective in ['classification', 'stability', 'focal', 'ldam'] and test_acc > best_acc:
             best_acc = test_acc
 
-
-
 def train(loader: DataLoader, denoiser: torch.nn.Module, criterion, optimizer: Optimizer, epoch: int, noise_sd: float, classifier: torch.nn.Module=None):
     """
     Function for training denoiser for one epoch
@@ -297,6 +280,9 @@ def train(loader: DataLoader, denoiser: torch.nn.Module, criterion, optimizer: O
     if classifier:
         classifier.eval()
 
+    # Define the resize transform
+    resize_transform = transforms.Resize((224, 224))
+
     for i, (inputs, targets) in enumerate(loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -308,10 +294,12 @@ def train(loader: DataLoader, denoiser: torch.nn.Module, criterion, optimizer: O
         noise = torch.randn_like(inputs, device='cuda') * noise_sd
 
         # compute output
-        outputs = denoiser(inputs + noise)
+        inputs = inputs + noise
+        inputs = resize_transform(inputs)
+        
+        outputs = denoiser(inputs)
         if classifier:
             outputs = classifier(outputs)
-            # if VIT == True :
             outputs = outputs.logits
         
         if isinstance(criterion, MSELoss):

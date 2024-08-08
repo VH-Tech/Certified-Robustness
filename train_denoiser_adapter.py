@@ -13,6 +13,8 @@ from torch.utils.data import DataLoader, Subset
 from train_utils import AverageMeter, accuracy, init_logfile, log, copy_code
 from mixup_utils import ComboLoader, get_combo_loader
 import torch.nn.functional as F
+import torchvision.transforms as transforms
+
 
 from utils import count_parameters_total, count_parameters_trainable
 import numpy as np
@@ -242,8 +244,8 @@ def main():
     if "vit" in args.arch or "swin" in args.arch:
         global VIT
         VIT = True
-        train_dataset = get_dataset(args.dataset, 'train', args.data_dir, model_input=224, do_norm=args.do_norm)
-        test_dataset = get_dataset(args.dataset, 'test', args.data_dir, model_input=224, do_norm=args.do_norm)
+        train_dataset = get_dataset(args.dataset, 'train', args.data_dir, model_input=32, do_norm=args.do_norm)
+        test_dataset = get_dataset(args.dataset, 'test', args.data_dir, model_input=32, do_norm=args.do_norm)
 
     else:
         train_dataset = get_dataset(args.dataset, 'train', args.data_dir, do_norm=args.do_norm)
@@ -540,6 +542,8 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
     # switch to train mode
     model.train()
+    # Define the resize transform
+    resize_transform = transforms.Resize((224, 224))
 
     for i, (inputs, targets) in enumerate(loader):
         # measure data loading time
@@ -554,7 +558,7 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
             noise_sd = random.random()
 
         inputs = inputs + (torch.randn_like(inputs, device='cuda') * noise_sd) 
-
+        inputs = resize_transform(inputs)
         # compute output
         outputs = model(inputs)
         if VIT == True :
@@ -765,6 +769,9 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
     # switch to eval mode
     model.eval()
 
+    # Define the resize transform
+    resize_transform = transforms.Resize((224, 224))
+
     with torch.no_grad():
         for i, (inputs, targets) in enumerate(loader):
             # measure data loading time
@@ -779,6 +786,7 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
                 noise_sd = random.random()
                 
             inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
+            inputs = resize_transform(inputs)
 
             # compute output
             outputs = model(inputs)

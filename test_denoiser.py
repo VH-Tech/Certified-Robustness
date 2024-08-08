@@ -9,6 +9,8 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToPILImage
 from train_utils import AverageMeter, accuracy, init_logfile, log
+import torchvision.transforms as transforms
+
 
 import argparse
 import datetime
@@ -41,7 +43,7 @@ def main(args):
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir)
 
-    test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
+    test_dataset = get_dataset(args.dataset, 'test', args.data_dir, model_input = 224)
     pin_memory = (args.dataset == "imagenet")
 
     if args.test_subset:
@@ -63,10 +65,13 @@ def main(args):
         
         elif args.clf in IMAGENET_CLASSIFIERS and args.dataset != 'imagenet':
             clf = get_architecture(args.clf ,args.dataset)
+            _, clf = clf
+
         else:
             args.clf = os.path.join(os.getenv('PT_DATA_DIR', './'), args.clf)
             checkpoint = torch.load(args.clf)
             clf = get_architecture(checkpoint['arch'], args.dataset)
+            _, clf = clf
             clf.load_state_dict(checkpoint['state_dict'])
 
         clf.cuda().eval()
@@ -142,7 +147,6 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float,
 
         return losses.avg
 
-
 def test_with_classifier(loader: DataLoader, denoiser: torch.nn.Module, criterion, noise_sd: float, print_freq: int, classifier: torch.nn.Module):
     """
     A function to test the classification performance of a denoiser when attached to a given classifier
@@ -165,6 +169,9 @@ def test_with_classifier(loader: DataLoader, denoiser: torch.nn.Module, criterio
     if denoiser:
         denoiser.eval()
 
+    # Define the resize transform
+    resize_transform = transforms.Resize((224, 224))
+
     with torch.no_grad():
         for i, (inputs, targets) in enumerate(loader):
             # measure data loading time
@@ -175,7 +182,8 @@ def test_with_classifier(loader: DataLoader, denoiser: torch.nn.Module, criterio
 
             # augment inputs with noise
             inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
-
+            inputs = resize_transform(inputs)
+            
             if denoiser is not None:
                 inputs = denoiser(inputs)
             # compute output
@@ -204,7 +212,6 @@ def test_with_classifier(loader: DataLoader, denoiser: torch.nn.Module, criterio
 
         return (losses.avg, top1.avg)
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
     parser.add_argument('--dataset', type=str, choices=DATASETS, required=True)
@@ -215,7 +222,7 @@ if __name__ == "__main__":
     parser.add_argument('--outdir', type=str, default='resnet18_breakhis/test_denoise/', help='folder to save model and training log)')
     parser.add_argument('--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
-    parser.add_argument('--batch', default=16, type=int, metavar='N',
+    parser.add_argument('--batch', default=64, type=int, metavar='N',
                         help='batchsize (default: 256)')
     parser.add_argument('--gpu', default=None, type=str,
                         help='id(s) for CUDA_VISIBLE_DEVICES')

@@ -97,7 +97,6 @@ def _cifar10(split: str, data_dir, model_input, do_norm) -> Dataset:
         transform = transforms.Compose([
             transforms.Resize(model_input),
             transforms.ToTensor(),
-            # transforms.Normalize(mean=_CIFAR10_MEAN, std=_CIFAR10_STDDEV),
             ])
     else:
         transform = transforms.Compose([
@@ -105,20 +104,6 @@ def _cifar10(split: str, data_dir, model_input, do_norm) -> Dataset:
             transforms.ToTensor(),
             ])
     return datasets.CIFAR10(data_dir, train=train, download=True, transform=transform)
-
-    # dataset_path = os.path.join(os.getenv('PT_DATA_DIR', 'datasets'), 'dataset_cache')
-    # if split == "train":
-    #     return datasets.CIFAR10(dataset_path, train=True, download=True, transform=transforms.Compose([
-    #         transforms.RandomCrop(32, padding=4),
-    #         transforms.RandomHorizontalFlip(),
-    #         transforms.ToTensor()
-    #     ]))
-    # elif split == "test":
-    #     return datasets.CIFAR10(dataset_path, train=False, download=True, transform=transforms.ToTensor())
-
-    # else:
-    #     raise Exception("Unknown split name.")
-
 
 def _imagenet(split: str) -> Dataset:
     if not IMAGENET_LOC_ENV in os.environ:

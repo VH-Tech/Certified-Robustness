@@ -31,32 +31,17 @@ parser.add_argument('--outdir', type=str,
                     help='folder to save model and training log)')
 parser.add_argument('--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=90, type=int, metavar='N',
-                    help='number of total epochs to run')
+
 parser.add_argument('--batch', default=64, type=int, metavar='N',
                     help='batchsize (default: 256)')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
-                    help='initial learning rate', dest='lr')
-parser.add_argument('--lr_step_size', type=int, default=30,
-                    help='How often to decrease learning by gamma.')
-parser.add_argument('--gamma', type=float, default=0.1,
-                    help='LR is multiplied by gamma on schedule.')
-parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                    help='momentum')
-parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,
-                    metavar='W', help='weight decay (default: 5e-4)')
-parser.add_argument('--gpu', default=None, type=str,
-                    help='id(s) for CUDA_VISIBLE_DEVICES')
+
 parser.add_argument('--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--noise_sd', default=0.0, type=float,
                     help="standard deviation of noise distribution for data augmentation")
 parser.add_argument('--resume', action='store_true',
                     help='if true, tries to resume training from an existing checkpoint')
-parser.add_argument('--azure_datastore_path', type=str, default='',
-                    help='Path to imagenet on azure')
-parser.add_argument('--philly_imagenet_path', type=str, default='',
-                    help='Path to imagenet on philly')
+
 parser.add_argument('--focal', default=0, type=int,
                     help='use focal loss')
 parser.add_argument('--data_dir', type=str, default='./data',
@@ -73,24 +58,13 @@ parser.add_argument('--mixup', type=str, default=None,
 
 args = parser.parse_args()
 
-if args.azure_datastore_path:
-    os.environ['IMAGENET_DIR_AZURE'] = os.path.join(args.azure_datastore_path, 'datasets/imagenet_zipped')
-if args.philly_imagenet_path:
-    os.environ['IMAGENET_DIR_PHILLY'] = os.path.join(args.philly_imagenet_path, './')
-
 random.seed(0)
-# torch.manual_seed(0)
-# torch.cuda.manual_seed_all(0)
+torch.manual_seed(0)
+torch.cuda.manual_seed_all(0)
 global VIT
 VIT = False
 
 def main():
-    if args.gpu:
-        # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-        pass
-    
-    # Copy code to output directory
-    # copy_code(args.outdir)
 
     if "vit" in args.arch or "swin" in args.arch:
         global VIT
@@ -109,7 +83,7 @@ def main():
 
     model = get_architecture(args.arch, args.dataset)
     normalize_layer, model = model
-
+    print("removed normalization layer")
     if args.focal:
 
         class_frequency = torch.unique(torch.tensor(train_dataset.targets), return_counts=True)[1] if args.dataset == 'pneumonia' else train_dataset.get_frequency()
@@ -121,16 +95,20 @@ def main():
 
     ## Load Weights if required
     if args.dataset not in ["imagenet","cifar10"]:
+
         model_path = os.path.join(args.outdir, 'checkpoint.pth.tar')
         if os.path.isfile(model_path):
             print("=> loading checkpoint '{}'".format(model_path))
-            checkpoint = torch.load(model_path,
-                                    map_location=lambda storage, loc: storage)
-
-            model.load_state_dict(checkpoint['state_dict'])
-
-            print("=> loaded checkpoint '{}' (epoch {})"
-                            .format(model_path, checkpoint['epoch']))
+            checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
+            new_state_dict = {}
+            for key, value in checkpoint["state_dict"].items():
+                if key.startswith("1.module."):
+                    new_key = key[9:]  # Remove the "1.module." prefix
+                else:
+                    new_key = key
+                new_state_dict[new_key] = value
+            model.load_state_dict(new_state_dict)
+            print("=> loaded checkpoint '{}' (epoch {})".format(model_path, checkpoint['epoch']))
 
         else:
             print("=> no checkpoint found at '{}', please check the path provided".format(args.outdir))
@@ -153,10 +131,10 @@ def main():
         adapters.init(model)
         model.load_adapter(adapter_path)
         model.set_active_adapters("denoising-adapter-"+str(int(args.noise_sd*100)))
-    # normalize_layer, model = model
+
     # model = torch.nn.Sequential(normalize_layer, model)
     model.to('cuda')
-    test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd - 0.75)
+    test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
     print(test_loss, test_acc)
 
 
