@@ -34,7 +34,7 @@ parser.add_argument('--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--dataset_fraction', default=1.0, type=float, metavar='N',
                     help='dataset fraction')
-parser.add_argument('--epochs', default=40, type=int, metavar='N',
+parser.add_argument('--epochs', default=90, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--batch', default=30, type=int, metavar='N',
                     help='batchsize (default: 256)')

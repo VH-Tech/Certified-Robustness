@@ -12,6 +12,8 @@ source activate /scratch/ravihm.scee.iitmandi/pytorch
 
 cd /scratch/ravihm.scee.iitmandi/Vatsal/Certified-Robustness/
 
-accelerate launch full_finetune.py --dataset cifar10 --arch vit --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/vit --noise_sd 0.25 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10 --dataset_fraction 1.0 --epochs 120
-accelerate launch full_finetune.py --dataset cifar10 --arch vit --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/vit --noise_sd 0.25 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10 --dataset_fraction 0.5 --epochs 120
-accelerate launch full_finetune.py --dataset cifar10 --arch vit --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/vit --noise_sd 0.25 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10 --dataset_fraction 0.1 --epochs 120
+accelerate launch full_finetune.py --dataset cifar10 --arch vit --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/vit --noise_sd 0.5 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10 --dataset_fraction 1.0 --epochs 120
+accelerate launch full_finetune.py --dataset cifar10 --arch vit --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/vit --noise_sd 0.75 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10 --dataset_fraction 1.0 --epochs 120
+
+CUDA_VISIBLE_DEVICES=0,1 accelerate launch train_denoiser_adapter.py --dataset cifar10 --arch vit --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/vit --batch 64 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10  --workers 8 --noise_sd 0.75 --dataset_fraction 1.0 --epochs 90
+CUDA_VISIBLE_DEVICES=0,1 accelerate launch train_denoiser_adapter.py --dataset cifar10 --arch vit --outdir /scratch/ravihm.scee.iitmandi/models/cifar10/vit --batch 64 --data_dir /scratch/ravihm.scee.iitmandi/dataset/cifar10  --workers 8 --noise_sd 0.5 --dataset_fraction 1.0 --epochs 90

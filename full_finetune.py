@@ -21,6 +21,7 @@ import numpy as np
 import os
 import time
 import torch
+import torchvision.transforms as transforms
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', type=str, 
@@ -92,8 +93,8 @@ def main():
         global VIT
         VIT = True
     if "vit" in args.arch or "swin" in args.arch:
-        train_dataset = get_dataset(args.dataset, 'train', args.data_dir, model_input=224)
-        test_dataset = get_dataset(args.dataset, 'test', args.data_dir, model_input=224)
+        train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
+        test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
     else:
         train_dataset = get_dataset(args.dataset, 'train', args.data_dir)
         test_dataset = get_dataset(args.dataset, 'test', args.data_dir)
@@ -113,7 +114,7 @@ def main():
                              num_workers=args.workers, pin_memory=pin_memory)
 
     model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method)
-    _, model = model
+    _, model = model # removed normalization layer
 
 
     if args.focal:
@@ -350,6 +351,8 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
     # switch to train mode
     model.train()
 
+    resize_transform = transforms.Resize((224, 224))
+
     for i, (inputs, targets) in enumerate(loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -359,6 +362,7 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
 
         # augment inputs with noise
         inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
+        inputs = resize_transform(inputs)
 
         # compute output
         outputs = model(inputs)
@@ -414,6 +418,7 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
     # switch to eval mode
     model.eval()
 
+    resize_transform = transforms.Resize((224, 224))
     with torch.no_grad():
         for i, (inputs, targets) in enumerate(loader):
             # measure data loading time
@@ -424,7 +429,7 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
 
             # augment inputs with noise
             inputs = inputs + torch.randn_like(inputs, device='cuda') * noise_sd
-
+            inputs = resize_transform(inputs)
             # compute output
             outputs = model(inputs)
             if VIT == True :

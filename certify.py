@@ -1,5 +1,5 @@
 # evaluate a smoothed classifier on a dataset
-from architectures import get_architecture, IMAGENET_CLASSIFIERS
+from architectures import get_architecture, IMAGENET_CLASSIFIERS, CIFAR10_CLASSIFIERS
 from core import Smooth
 from datasets import get_dataset, DATASETS, get_num_classes
 from time import time
@@ -29,24 +29,31 @@ parser.add_argument('--philly_imagenet_path', type=str, default='',
                     help='Path to imagenet on philly')
 args = parser.parse_args()
 
-if args.azure_datastore_path:
-    os.environ['IMAGENET_DIR_AZURE'] = os.path.join(args.azure_datastore_path, 'datasets/imagenet_zipped')
-elif args.philly_imagenet_path:
-    os.environ['IMAGENET_DIR_PHILLY'] = os.path.join(args.philly_imagenet_path, './')
-else:
-    os.environ['IMAGENET_DIR_PHILLY'] = "/hdfs/public/imagenet/2012/"
+def remove_module_prefix(state_dict):
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        new_key = key.replace("module.", "")
+        new_state_dict[new_key] = value
+    return new_state_dict
 
 
 if __name__ == "__main__":
     # load the base classifier
-    if args.base_classifier in IMAGENET_CLASSIFIERS:
+    if args.base_classifier in IMAGENET_CLASSIFIERS and args.dataset == 'imagenet':
         assert args.dataset == 'imagenet'
         # loading pretrained imagenet architectures
         base_classifier = get_architecture(args.base_classifier ,args.dataset, pytorch_pretrained=True)
+
+    if args.base_classifier in CIFAR10_CLASSIFIERS and args.dataset == 'cifar10':
+        assert args.dataset == 'cifar10'
+        # loading pretrained imagenet architectures
+        base_classifier = get_architecture(args.base_classifier ,args.dataset, pytorch_pretrained=True)
+        _ , base_classifier = base_classifier
     else:
         checkpoint = torch.load(args.base_classifier)
         base_classifier = get_architecture(checkpoint['arch'], args.dataset)
-        base_classifier.load_state_dict(checkpoint['state_dict'])
+        state_dict = remove_module_prefix(checkpoint['state_dict'])
+        base_classifier.load_state_dict(state_dict)
 
     if args.denoiser != '':
         checkpoint = torch.load(args.denoiser)
@@ -73,7 +80,8 @@ if __name__ == "__main__":
     f.close()
 
     # iterate through the dataset
-    dataset = get_dataset(args.dataset, args.split)
+    dataset = get_dataset(args.dataset, args.split, "/scratch/ravihm.scee.iitmandi/dataset/cifar10")
+    
     for i in range(len(dataset)):
 
         # only certify every args.skip examples, and stop after args.max examples

@@ -51,9 +51,7 @@ parser.add_argument('--batch', default=256, type=int, metavar='N',
                     help='batchsize (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     help='initial learning rate', dest='lr')
-
 parser.add_argument('--scheduler', default='cosine', type=str, choices=['cosine', 'step'])
-
 parser.add_argument('--lr_step_size', type=int, default=30,
                     help='How often to decrease learning by gamma.')
 parser.add_argument('--gamma', type=float, default=0.1,
@@ -313,7 +311,7 @@ def main():
         adapters.init(model)
 
     if args.dataset in ["cifar10", "imagenet"]:
-        normalize_layer, model = model
+        normalize_layer, model = model # remove normalization layer
         adapters.init(model)
 
     if args.resume : 
