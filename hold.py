@@ -1,2 +1,4 @@
+import time
 while True:
-    pass
+    print("hello")
+    time.sleep(2)

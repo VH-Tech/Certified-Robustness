@@ -3,7 +3,7 @@ from architectures import get_architecture, IMAGENET_CLASSIFIERS, CIFAR10_CLASSI
 from core import Smooth
 from datasets import get_dataset, DATASETS, get_num_classes
 from time import time
-
+import adapters
 import argparse
 import datetime
 import os
@@ -25,6 +25,8 @@ parser.add_argument('--denoiser', type=str, default='',
                     help='Path to a denoiser to attached before classifier during certificaiton.')
 parser.add_argument('--azure_datastore_path', type=str, default='',
                     help='Path to imagenet on azure')
+parser.add_argument('--adapter', type=str, default='',
+                    help='Path to adapter to attached before classifier during certificaiton.')
 parser.add_argument('--philly_imagenet_path', type=str, default='',
                     help='Path to imagenet on philly')
 args = parser.parse_args()
@@ -56,6 +58,11 @@ if __name__ == "__main__":
             norm_layer, base_classifier = base_classifier
         state_dict = remove_module_prefix(checkpoint['state_dict'])
         base_classifier.load_state_dict(state_dict)
+
+    if args.adapter != '':
+        adapters.init(base_classifier)
+        base_classifier.load_adapter(args.adapter)
+        base_classifier.set_active_adapters("denoising-adapter-"+str(int(args.sigma*100)))
 
     if args.denoiser != '':
         checkpoint = torch.load(args.denoiser)

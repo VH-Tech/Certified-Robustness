@@ -6,7 +6,7 @@ from statsmodels.stats.proportion import proportion_confint
 import pandas as pd
 import json
 import os 
-
+import torchvision.transforms as transforms
 # from IPython import embed
 
 class Smooth(object):
@@ -95,10 +95,10 @@ class Smooth(object):
 
                 batch = x.repeat((this_batch_size, 1, 1, 1))
                 noise = torch.randn_like(batch, device='cuda') * self.sigma
-                print("noise dimension : ", noise.shape)
+                # print("noise dimension : ", noise.shape)
                 batch = batch + noise
                 batch = resize_transform(batch)
-                predictions = self.base_classifier(batch).argmax(1)
+                predictions = self.base_classifier(batch).logits.argmax(1)
                 counts += self._count_arr(predictions.cpu().numpy(), self.num_classes)
             return counts
 

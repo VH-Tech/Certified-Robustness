@@ -12,4 +12,4 @@ source activate /scratch/ravihm.scee.iitmandi/pytorch
 
 cd /home/ravihm.scee.iitmandi/Certified-Robustness
 
-python hold.py
+python /scratch/ravihm.scee.iitmandi/Vatsal/Certified-Robustness/hold.py
