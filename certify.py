@@ -85,8 +85,7 @@ if __name__ == "__main__":
 
     # iterate through the dataset
     dataset = get_dataset(args.dataset, args.split, "/scratch/ravihm.scee.iitmandi/dataset/cifar10")
-    total_num = 0
-    correct = 0
+
     for i in range(len(dataset)):
 
         # only certify every args.skip examples, and stop after args.max examples
@@ -102,10 +101,10 @@ if __name__ == "__main__":
         x = x.cuda()
         prediction, radius = smoothed_classifier.certify(x, args.N0, args.N, args.alpha, args.batch)
         after_time = time()
-        correct += int(prediction == label)
+        correct = int(prediction == label)
 
         time_elapsed = str(datetime.timedelta(seconds=(after_time - before_time)))
-        total_num += 1
+
 
         f = open(args.outfile, 'a')
         print("{}\t{}\t{}\t{:.3}\t{}\t{}".format(
@@ -113,6 +112,4 @@ if __name__ == "__main__":
         print("{}\t{}\t{}\t{:.3}\t{}\t{}".format(
             i, label, prediction, radius, correct, time_elapsed), flush=True)
         
-
-    print("sigma %.2f accuracy of smoothed classifier %.4f "%(args.sigma, correct/float(total_num)), file = f, flush=True)
     f.close()

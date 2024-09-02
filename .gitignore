@@ -16,3 +16,4 @@ PDFs
 weights
 slurm*
 models
+*.pyc
