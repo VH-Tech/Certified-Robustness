@@ -38,9 +38,9 @@ parser.add_argument('--epochs', default=90, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--batch', default=30, type=int, metavar='N',
                     help='batchsize (default: 256)')
-parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float,
+parser.add_argument('--lr', '--learning-rate', default=1.5e-3, type=float,
                     help='initial learning rate', dest='lr')
-parser.add_argument('--lr_step_size', type=int, default=30,
+parser.add_argument('--lr_step_size', type=int, default=60,
                     help='How often to decrease learning by gamma.')
 parser.add_argument('--gamma', type=float, default=0.1,
                     help='LR is multiplied by gamma on schedule.')

@@ -88,8 +88,6 @@ parser.add_argument('--ssl_like', type=int, default=0,
                     help='do ssl like criterion')
 parser.add_argument('--do_norm', type=int, default=1, 
                     help='do ssl like criterion')
-
-
 parser.add_argument('--do_fourier', type=int, default=0, 
                     help='do fourier transform before vit layer')
 parser.add_argument('--gap', type=int, default=1)
