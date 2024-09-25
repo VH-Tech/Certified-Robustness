@@ -4,9 +4,10 @@ from __future__ import absolute_import
 This file is from: https://raw.githubusercontent.com/bearpaw/pytorch-classification/master/models/cifar/resnet.py
 by Wei Yang
 '''
-import torch.nn as nn
 import math
 
+import torch.nn as nn
+from vector_quantize_pytorch import VectorQuantize
 
 __all__ = ['resnet']
 
@@ -89,7 +90,7 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, depth, num_classes=1000, block_name='BasicBlock'):
+    def __init__(self, depth, num_classes=1000, block_name='BasicBlock', vq = False):
         super(ResNet, self).__init__()
         # Model type specifies number of layers for CIFAR-10 model
         if block_name.lower() == 'basicblock':
@@ -103,7 +104,7 @@ class ResNet(nn.Module):
         else:
             raise ValueError('block_name shoule be Basicblock or Bottleneck')
 
-
+        self.vq = vq
         self.inplanes = 16
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1,
                                bias=False)
@@ -113,6 +114,8 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 32, n, stride=2)
         self.layer3 = self._make_layer(block, 64, n, stride=2)
         self.avgpool = nn.AvgPool2d(8)
+        if vq:
+            self.vector_quant = VectorQuantize(dim=64, accept_image_fmap=True, codebook_size=512) 
         self.fc = nn.Linear(64 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -151,6 +154,8 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
+        if self.vq:
+            x, indices, commit_loss = self.vector_quant(x).clamp(-1, 1)
         x = self.fc(x)
 
         return x

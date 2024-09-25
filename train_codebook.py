@@ -105,7 +105,7 @@ def main():
     
     print("dataloaders created")
 
-    model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method)
+    model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method, vq=True)
     if "vit" in args.arch or "swin" in args.arch:
         normalize_layer, model = model
 
@@ -131,13 +131,12 @@ def main():
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = pjoin(args.outdir, 'checkpoint.pth.tar')
     
-    if args.resume and os.path.isfile(model_path):
+    if os.path.isfile(model_path):
         print("=> loading checkpoint '{}'".format(model_path))
         checkpoint = torch.load(model_path,
                                 map_location=lambda storage, loc: storage)
         # starting_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        model.load_state_dict(checkpoint['state_dict'], strict=False)
         print("=> loaded checkpoint '{}' (epoch {})"
                         .format(model_path, checkpoint['epoch']))
         
@@ -176,7 +175,7 @@ def main():
         scheduler.step(epoch)
        
         if test_acc > best:
-            print(f'New Best Found: {test_acc}%')
+            # print(f'New Best Found: {test_acc}%')
             best = test_acc
             if isinstance(model, nn.DataParallel):
                 model = model.module
@@ -186,7 +185,7 @@ def main():
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
-            }, os.path.join(args.outdir, 'checkpoint.pth.tar'))
+            }, os.path.join(args.outdir, 'vq' ,'checkpoint.pth.tar'))
 
         wandb.log({"train_loss": train_loss, "test_loss": test_loss, "train_acc": train_acc, "test_acc": test_acc, "best" : best, "lr" : scheduler.get_lr()[0]})
         
@@ -219,7 +218,7 @@ def train(loader: DataLoader, model: torch.nn.Module, criterion, optimizer: Opti
         targets = targets.cuda()
 
         # augment inputs with noise
-        inputs = inputs 
+        inputs = inputs + torch.randn_like(inputs) * noise_sd
 
         # compute output
         outputs = model(inputs)
@@ -288,7 +287,7 @@ def test(loader: DataLoader, model: torch.nn.Module, criterion, noise_sd: float)
             targets = targets.cuda()
 
             # augment inputs with noise
-            inputs = inputs
+            inputs = inputs + torch.randn_like(inputs) * noise_sd
 
             # compute output
             outputs = model(inputs)

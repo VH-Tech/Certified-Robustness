@@ -35,7 +35,6 @@ class LinearHead(nn.Module):
         x = self.dropout(x)
         x = self.linear(x)
         return x
-    
 
 IMAGENET_CLASSIFIERS = [
                         'resnet18', 
@@ -46,7 +45,7 @@ IMAGENET_CLASSIFIERS = [
                         ]
 
 CIFAR10_CLASSIFIERS = [
-                        'cifar_resnet110', 
+                        'cifar_resnet110', 'cifar_resnet50', 'cifar_resnet20',
                         'cifar_wrn', 'cifar_wrn40',
                         'VGG16', 'VGG19', 'ResNet18','PreActResNet18','GoogLeNet',
                         'DenseNet121','ResNeXt29_2x64d','MobileNet','MobileNetV2',
@@ -60,7 +59,7 @@ DENOISERS_ARCHITECTURES = ["cifar_dncnn", "cifar_dncnn_wide", "memnet", # cifar1
                             'imagenet_dncnn', 'imagenet_memnet' # imagenet denoisers
                         ]
 
-def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tuning_method: str = "full", pretrained_weights=None) -> torch.nn.Module:
+def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tuning_method: str = "full", pretrained_weights=None, vq = False) -> torch.nn.Module:
     """ Return a neural network (with random weights)
 
     :param arch: the architecture - should be in the ARCHITECTURES list above
@@ -382,9 +381,11 @@ def get_architecture(arch: str, dataset: str, pytorch_pretrained: bool=False, tu
 
     ## Cifar classifiers
     elif arch == "cifar_resnet20":
-        model = resnet_cifar(depth=20, num_classes=10).cuda()
+        model = resnet_cifar(depth=20, num_classes=10, vq = vq).cuda()
     elif arch == "cifar_resnet110":
-        model = resnet_cifar(depth=110, num_classes=10).cuda()
+        model = resnet_cifar(depth=110, num_classes=10, vq = vq).cuda()
+    elif arch == "cifar_resnet50":
+        model = resnet_cifar(depth=50, num_classes=10, vq = vq).cuda()
     elif arch == "imagenet32_resnet110":
         model = resnet_cifar(depth=110, num_classes=1000).cuda()
     elif arch == "imagenet32_wrn":
