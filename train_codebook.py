@@ -105,7 +105,7 @@ def main():
     
     print("dataloaders created")
 
-    model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method, vq=True)
+    model = get_architecture(args.arch, args.dataset, tuning_method=args.tuning_method, vq=False)
     if "vit" in args.arch or "swin" in args.arch:
         normalize_layer, model = model
 
@@ -122,7 +122,7 @@ def main():
 
 
     starting_epoch = 0
-    logfilename = os.path.join(args.outdir, 'log.txt')
+    logfilename = os.path.join(args.outdir,'vq','log.txt')
 
     optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     scheduler = StepLR(optimizer, step_size=args.lr_step_size, gamma=args.gamma)
@@ -130,26 +130,13 @@ def main():
 
     ## Resume from checkpoint if exists and if resume flag is True
     model_path = pjoin(args.outdir, 'checkpoint.pth.tar')
-    
-    if os.path.isfile(model_path):
-        print("=> loading checkpoint '{}'".format(model_path))
-        checkpoint = torch.load(model_path,
-                                map_location=lambda storage, loc: storage)
-        # starting_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['state_dict'], strict=False)
-        print("=> loaded checkpoint '{}' (epoch {})"
-                        .format(model_path, checkpoint['epoch']))
-        
-    else:
-        if args.resume: print("=> no checkpoint found at '{}'".format(args.outdir))
-        init_logfile(logfilename, "epoch\ttime\tlr\ttrainloss\ttestloss\ttrainAcc\ttestAcc")
-     
+
     best = 0.0 
 
-    print("training ", count_parameters_trainable(model)/count_parameters_total(model), " of parameters")
+    # print("training ", count_parameters_trainable(model)/count_parameters_total(model), " of parameters")
     wandb.init(
     # set the wandb project where this run will be logged
-    project=args.arch+"_"+args.dataset+"_"+args.tuning_method+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd),
+    project=args.arch+"_"+args.dataset+"_"+args.tuning_method+"_"+str(args.dataset_fraction)+"_"+str(args.noise_sd)+"_vq",
 
     # track hyperparameters and run metadata
     config={
@@ -169,9 +156,9 @@ def main():
         test_loss, test_acc = test(test_loader, model, criterion, args.noise_sd)
         after = time.time()
 
-        log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
-            epoch, after - before,
-            scheduler.get_lr()[0], train_loss, test_loss, train_acc, test_acc))
+        # log(logfilename, "{}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}".format(
+        #     epoch, after - before,
+        #     scheduler.get_lr()[0], train_loss, test_loss, train_acc, test_acc))
         scheduler.step(epoch)
        
         if test_acc > best:
@@ -180,6 +167,7 @@ def main():
             if isinstance(model, nn.DataParallel):
                 model = model.module
 
+            os.makedirs(os.path.join(args.outdir, 'vq'), exist_ok=True)
             torch.save({
                 'epoch': epoch + 1,
                 'arch': args.arch,
