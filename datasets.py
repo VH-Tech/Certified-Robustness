@@ -185,8 +185,8 @@ def _hyper(split: str, data_dir, noise_sd) -> Dataset:
    
     if split == "train":
         return Hyper(root=data_dir, train=True, transform=transforms.Compose([
-                        transforms.Resize((256,256)),
-                        transforms.RandomCrop(224), 
+                        transforms.Resize((224,224)),
+                        # transforms.RandomCrop(224), 
                         transforms.RandomHorizontalFlip(), 
                         transforms.ToTensor(),
                         # transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STDDEV)
